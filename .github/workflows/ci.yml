@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linkcheck:
+    name: Spec link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Resolves every relative markdown link and heading anchor, and fails on any
+      # unconverted [[wikilink]] left over from the design vault. No network: external
+      # links are deliberately not fetched so CI cannot break on a third-party outage.
+      - name: Check relative links and anchors
+        run: node tools/linkcheck.mjs
+
+  vectors:
+    name: Test vectors
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/vectors-gen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/vectors-gen/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build generator
+        run: npm run build
+
+      # Self-check: re-derives every key, re-canonicalizes every case, re-verifies every
+      # signature, replays every transition chain through the reference verifier, and
+      # diffs the result against the committed vectors. Drift fails the build.
+      - name: Self-check (regenerate + diff + replay)
+        run: node dist/selfcheck.js
+
+      - name: JSON Schema validation of all vectors
+        run: node dist/validate.js
+
+      # Belt and braces: prove `npm run generate` leaves the working tree untouched, so a
+      # hand-edited vector cannot survive even if it happens to satisfy the self-check.
+      - name: Regenerate and assert no diff
+        run: |
+          node dist/generate.js
+          cd "$GITHUB_WORKSPACE"
+          if ! git diff --exit-code -- vectors/; then
+            echo "::error::Committed vectors differ from regeneration. Run 'npm run generate' in tools/vectors-gen and commit the result."
+            exit 1
+          fi

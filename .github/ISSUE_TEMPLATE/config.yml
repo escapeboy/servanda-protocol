@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/escapeboy/servanda-protocol/security/advisories/new
+    about: >-
+      Do NOT open a public issue for a security problem. Report privately — see SECURITY.md.
+  - name: Governance and the change process
+    url: https://github.com/escapeboy/servanda-protocol/blob/main/GOVERNANCE.md
+    about: How spec changes are classified, discussed, versioned, and merged.
