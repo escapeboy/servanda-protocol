@@ -32,3 +32,14 @@ Periodic pairwise sync between nodes sharing edges:
 
 - `recover_request`: `{ persona: "<restored persona_id>", proof: "<rotation statement | fresh signature challenge>" }` sent to known counterparties/hubs.
 - `recover_response`: all edges + assertion chains where the requester is a party. Responders MUST verify the persona (or its rotation successor) before answering and MUST NOT include plaintext (hashes only; plaintext recovery is a human act between counterparties).
+
+## 6.7 Addressing & offline delivery (added 2026-07-25)
+
+**Delivery model: asynchronous, store-and-forward, reconciliation-guaranteed.** No protocol operation is real-time; an offline counterparty is the normal case, not an edge case.
+
+- **Inbox designation:** a persona routable over the hub transport publishes a self-signed inbox record `{ v, type:"inbox", persona, hubs:["https://hub.example/servanda"], issued_at, sig }`. Only the persona key may change its own hubs (a hub cannot "move" its users). Org personas MAY inherit hubs from the org domain anchor (§1.5); the inbox record overrides.
+- **Address form (informative):** clients SHOULD render routable personas as `<petname or handle> @ <hub domain>` with the seal level; the wire identity remains the persona key.
+- **Store-and-forward:** sender delivers ciphertext to any of the recipient's declared hubs; hubs queue with a TTL (RECOMMENDED ≥ 30 days) and MUST deliver only to the persona (signature-challenge auth, §6.1). Senders SHOULD retry across declared hubs.
+- **Delivery is optimization; reconciliation is the guarantee.** Loss of any queued message is healed by the next §6.4 recon exchange between the parties; nothing shared can be permanently lost while either party holds it.
+- **Out-of-band bootstrap (first contact / no node):** when the sender knows no inbox for the counterparty, a `propose` MAY travel as a self-contained signed payload in a URL/QR over any existing channel (email, chat). The recipient's node — or a hosted courtesy renderer for recipients without one — verifies the signature and presents the proposal; confirmation happens from their node (possibly created at that moment). This is the mechanical attachment point of the expectation→invitation flow (ADR-0013). A courtesy renderer MUST NOT be able to sign anything (it renders; the human confirms from a node holding keys).
+- **Git transport:** the shared repository is itself the store-and-forward medium; offline tolerance is inherent (push/pull on connect).
