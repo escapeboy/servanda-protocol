@@ -14,6 +14,7 @@ import {
   ALICE,
   BOB,
   CAROL,
+  HUB_OPERATOR,
   ORG_MNEMONIC,
   ORG_ROOT,
   PERSONA_MNEMONIC,
@@ -22,14 +23,29 @@ import {
   commitmentHash,
   commitmentHashPreimage,
   edgeId,
+  makeAssertion,
+  makeEdge,
   type Commitment,
 } from './protocol.js';
+import {
+  OOB_URL_PREFIX,
+  decodeOob,
+  encodeOob,
+  makeInboxRecord,
+  oobUrl,
+  payloadFromOobUrl,
+  sameObject,
+  verifyInboxRecord,
+  type InboxRecord,
+  type KnownKey,
+} from './addressing.js';
 import {
   digestHex,
   derivePersona,
   mnemonicToSeed,
   signObject,
   toHex,
+  verifyObject,
   PURPOSE_CONSTANT,
 } from './crypto.js';
 import { CANONICALIZATION_CASES } from './cases-canonicalization.js';
@@ -397,6 +413,240 @@ export function buildTransitionsInvalid() {
   };
 }
 
+/** Labels every addressing vector shares, so a rejection reason can name the actual signer. */
+const ADDRESSING_KNOWN_KEYS: KnownKey[] = [
+  { label: 'alice', personaId: ALICE.personaId },
+  { label: 'bob', personaId: BOB.personaId },
+  { label: 'hub-operator', personaId: HUB_OPERATOR.personaId },
+];
+
+export function buildAddressingInbox() {
+  const record = (
+    name: string,
+    description: string,
+    opts: {
+      persona: string;
+      hubs: string[];
+      issued_at: string;
+      signer: typeof ALICE;
+      signerLabel: string;
+      corruptSignature?: boolean;
+    },
+  ) => {
+    const rec: InboxRecord = makeInboxRecord({ v: PROTOCOL_VERSION, ...opts });
+    const outcome = verifyInboxRecord(rec, ADDRESSING_KNOWN_KEYS);
+    const { sig: _sig, ...unsigned } = rec;
+    return {
+      name,
+      description,
+      signed_by: { label: opts.signerLabel, persona_id: opts.signer.personaId },
+      record: rec as unknown as Json,
+      canonical: canonicalize(unsigned as unknown as Json),
+      expected: {
+        accepted: outcome.accepted,
+        rejection_reason: outcome.accepted ? null : (outcome.reason ?? null),
+        actual_signer: outcome.signerLabel ?? null,
+      },
+    };
+  };
+
+  const cases = [
+    record(
+      'valid-self-signed',
+      'The base case: a persona declares one hub and signs the record with its own key. ' +
+        'The signature verifies against `persona` itself (§1.2: persona_id IS the public key), ' +
+        'so no registry and no hub cooperation is needed to accept it.',
+      {
+        persona: ALICE.personaId,
+        hubs: ['https://hub.example/servanda'],
+        issued_at: '2026-07-25T09:00:00Z',
+        signer: ALICE,
+        signerLabel: 'alice',
+      },
+    ),
+    record(
+      'valid-self-signed-multi-hub',
+      'Two declared hubs. §6.7 says senders SHOULD retry across declared hubs but does not ' +
+        'define whether array order is a priority order — see the tracked issue. The vector ' +
+        'fixes only that a multi-hub record is valid.',
+      {
+        persona: BOB.personaId,
+        hubs: ['https://hub.example/servanda', 'https://backup.hub.example/servanda'],
+        issued_at: '2026-07-25T09:05:00Z',
+        signer: BOB,
+        signerLabel: 'bob',
+      },
+    ),
+    record(
+      'invalid-signed-by-hub',
+      'THE negative case for M-17. The record names Alice as the persona but is signed by a ' +
+        'hub key, rewriting her hub list to a hub she never chose. §6.7: "Only the persona key ' +
+        'may change its own hubs (a hub cannot \'move\' its users)." A verifier that accepts ' +
+        'this lets any hub silently redirect another hub\'s users — the addressing equivalent ' +
+        'of forging an edge. MUST be rejected.',
+      {
+        persona: ALICE.personaId,
+        hubs: ['https://hub.attacker.example/servanda'],
+        issued_at: '2026-07-25T09:10:00Z',
+        signer: HUB_OPERATOR,
+        signerLabel: 'hub-operator',
+      },
+    ),
+    record(
+      'invalid-corrupted-signature',
+      'Control: a record self-signed by the persona whose signature has one flipped nibble. ' +
+        'Rejected for a different reason than the hub-signed case, which is how an implementer ' +
+        'can tell the two failures apart.',
+      {
+        persona: ALICE.personaId,
+        hubs: ['https://hub.example/servanda'],
+        issued_at: '2026-07-25T09:15:00Z',
+        signer: ALICE,
+        signerLabel: 'alice',
+        corruptSignature: true,
+      },
+    ),
+  ];
+
+  const hubSigned = cases.find((c) => c.name === 'invalid-signed-by-hub')!;
+  if (hubSigned.expected.accepted || hubSigned.expected.rejection_reason !== 'signer-is-not-the-persona') {
+    throw new Error('inbox vectors: the hub-signed record must be rejected as signer-is-not-the-persona');
+  }
+
+  return {
+    ...banner('spec/06-reconciliation-federation.md §6.7, conformance M-17'),
+    description:
+      'Inbox records `{ v, type:"inbox", persona, hubs, issued_at, sig }`. Verification rule: ' +
+      'the signature MUST verify against the key named in `persona`. `known_keys` exists only so ' +
+      'a verifier can report WHICH other key signed a rejected record; a verifier without it ' +
+      'still rejects, as `invalid-signature`.',
+    verification_rule:
+      'ed25519_verify(sig, sha256(JCS(record minus "sig")), public_key = hex_decode(record.persona))',
+    known_keys: ADDRESSING_KNOWN_KEYS.map((k) => ({ label: k.label, persona_id: k.personaId })),
+    hub_queue_ttl: {
+      recommended_minimum: 'P30D',
+      recommended_minimum_seconds: 2592000,
+      note:
+        '§6.7: hubs queue undelivered ciphertext with a TTL, RECOMMENDED >= 30 days. This is a ' +
+        'FIXTURE CONSTANT ONLY — the suite deliberately contains no time-travel test for it. ' +
+        'Generation is clockless, and more importantly TTL expiry is not a correctness boundary: ' +
+        '§6.7 makes queued-message loss harmless because reconciliation (§6.4), not delivery, is ' +
+        'the guarantee. The value is pinned here so implementations agree on the boundary, not so ' +
+        'they can be tested against a clock.',
+    },
+    cases,
+  };
+}
+
+export function buildAddressingOob() {
+  const commitment_hash = commitmentHash(baseCommitment);
+  const proposed_at = '2026-07-25T09:00:00Z';
+
+  const edge = makeEdge({
+    commitment_hash,
+    owner: ALICE.personaId,
+    owed_to: BOB.personaId,
+    proposed_at,
+    due: '2026-08-01T17:00:00Z',
+  });
+  const assertion = makeAssertion({
+    edge_id: edge.edge_id,
+    state: 'proposed',
+    asserted_at: proposed_at,
+    signer: ALICE,
+  });
+
+  // §6.2: every wire message is { v, type, payload, sender, sent_at, sig }.
+  const unsigned = {
+    v: PROTOCOL_VERSION,
+    type: 'propose',
+    payload: { edge, assertion },
+    sender: ALICE.personaId,
+    sent_at: proposed_at,
+  } as unknown as Record<string, Json>;
+  const message = { ...unsigned, sig: signObject(unsigned, ALICE.privateKey) } as unknown as Json;
+
+  const encoded = encodeOob(message);
+  const url = oobUrl(encoded);
+
+  // Round-trip, computed rather than asserted: decode what was encoded and compare.
+  const extracted = payloadFromOobUrl(url);
+  if (extracted !== encoded) throw new Error('oob: URL fragment does not round-trip');
+  const decoded = decodeOob(extracted);
+  if (!sameObject(decoded, message)) throw new Error('oob: decoded message differs from the original');
+  if (!sameObject((decoded as any).payload.edge, edge as unknown as Json)) {
+    throw new Error('oob: decoded edge differs from the original edge object');
+  }
+  if (!verifyObject(decoded as Record<string, Json>, (decoded as any).sig, ALICE.publicKey)) {
+    throw new Error('oob: signature does not verify after the round trip');
+  }
+
+  // Negative control: one mutated payload character must survive decoding but fail verification.
+  const tamperedEdge = {
+    ...edge,
+    owed_to: CAROL.personaId,
+  };
+  const tamperedMessage = {
+    ...(message as any),
+    payload: { edge: tamperedEdge, assertion },
+  } as unknown as Json;
+  const tamperedEncoded = encodeOob(tamperedMessage);
+  if (verifyObject(tamperedMessage as Record<string, Json>, (message as any).sig, ALICE.publicKey)) {
+    throw new Error('oob: tampered payload still verifies — the negative control is broken');
+  }
+
+  return {
+    ...banner('spec/06-reconciliation-federation.md §6.7 (out-of-band bootstrap), §6.2'),
+    description:
+      'First contact with a counterparty who has no node and no inbox: a `propose` message ' +
+      'travels as a self-contained signed payload in a URL or QR code. The recipient (or a ' +
+      'courtesy renderer, which MUST NOT hold keys — M-18) verifies the signature offline, from ' +
+      'the payload alone. Round-trip: decode(encode(m)) == m, and the signature still verifies.',
+    encoding: {
+      scheme: 'base64url(JCS(message)) — RFC 4648 §5, unpadded, over the UTF-8 canonical bytes',
+      url_form: `${OOB_URL_PREFIX}<payload>`,
+      note:
+        'INTERPRETATION — §6.7 fixes no serialization for the URL/QR form. The payload is carried ' +
+        'in the URL FRAGMENT so it is never sent to the renderer\'s server. Not normative; tracked ' +
+        'as a repository issue.',
+    },
+    cases: [
+      {
+        name: 'propose-roundtrip',
+        description:
+          'Encode the signed propose, carry it in a URL fragment, decode it, and verify. ' +
+          '`decoded_equals_original` and `edge_equals_original` are the round-trip assertions; ' +
+          '`signature_verifies` is what makes the payload self-contained — no hub, no network, ' +
+          'no prior contact is needed to establish that Alice signed this proposal.',
+        sender: { label: 'alice', persona_id: ALICE.personaId },
+        message: message as Json,
+        canonical: canonicalize(message),
+        payload_b64url: encoded,
+        url,
+        decoded_equals_original: true,
+        edge_equals_original: true,
+        signature_verifies: true,
+      },
+      {
+        name: 'tampered-payload-does-not-verify',
+        description:
+          'The same payload with `owed_to` swapped to a third persona and the original signature ' +
+          'kept. It decodes cleanly — base64url and JSON say nothing about authenticity — and ' +
+          'MUST fail signature verification. A courtesy renderer that skips this check is a ' +
+          'phishing surface, not a renderer.',
+        sender: { label: 'alice', persona_id: ALICE.personaId },
+        message: tamperedMessage,
+        canonical: canonicalize(tamperedMessage),
+        payload_b64url: tamperedEncoded,
+        url: oobUrl(tamperedEncoded),
+        decoded_equals_original: false,
+        edge_equals_original: false,
+        signature_verifies: false,
+      },
+    ],
+  };
+}
+
 export interface GeneratedFile {
   path: string;
   content: string;
@@ -410,6 +660,8 @@ export function buildAll(): GeneratedFile[] {
     { path: 'derivation/persona-keys.json', content: serialize(buildDerivation()) },
     { path: 'transitions/valid.json', content: serialize(buildTransitionsValid()) },
     { path: 'transitions/invalid.json', content: serialize(buildTransitionsInvalid()) },
+    { path: 'addressing/inbox-records.json', content: serialize(buildAddressingInbox()) },
+    { path: 'addressing/oob-bootstrap.json', content: serialize(buildAddressingOob()) },
   ];
 }
 

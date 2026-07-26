@@ -34,6 +34,8 @@ const orgSeed = mnemonicToSeed(ORG_MNEMONIC);
 export const ALICE: Persona = derivePersona(personaSeed, 0); // owner
 export const BOB: Persona = derivePersona(personaSeed, 1); // owed_to
 export const CAROL: Persona = derivePersona(personaSeed, 2); // non-party
+/** §6.7: the key a store-and-forward hub operates under — never a party to an edge. */
+export const HUB_OPERATOR: Persona = derivePersona(personaSeed, 3);
 export const ORG_ROOT: Persona = derivePersona(orgSeed, 0);
 
 export interface Commitment {
