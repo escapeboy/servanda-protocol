@@ -18,6 +18,8 @@
 - **M-14** Assertions violating the transition table are invalid and MUST be discarded.
 - **M-15** Retention decay: after retention, plaintext SHOULD be deleted, edge+assertion chains MUST be preserved. Personal-scope escrow MUST NOT exist; team-scope escrow MUST be protocol-visible.
 - **M-16** A device key MUST NOT be sole custodian of vault content keys.
+- **M-17** Only the persona key may alter its inbox record: a record whose signature does not verify against the persona it names MUST be rejected. A hub cannot move its users.
+- **M-18** A courtesy renderer MUST NOT hold or use signing keys. It verifies and presents; confirmation is asserted from a node holding the persona's keys.
 
 ## Conformance levels
 
@@ -28,4 +30,4 @@
 
 ## Conformance suite
 
-A public test suite defines "implements Servanda" (ADR-0001: whoever controls the definition of compatible controls the protocol). v0 suite scope: canonical-form vectors (JCS + hashing), signature vectors, transition-table property tests (invalid assertion rejection), visibility matrix tests, M-11 negative tests. Suite is the gate for use of the protocol name/mark.
+A public test suite defines "implements Servanda" (ADR-0001: whoever controls the definition of compatible controls the protocol). v0 suite scope: canonical-form vectors (JCS + hashing), signature vectors, transition-table property tests (invalid assertion rejection), visibility matrix tests, M-11 negative tests, §6.7 addressing vectors (M-17 negative test: an inbox record signed by a hub key rather than the persona key is rejected; out-of-band bootstrap payload round-trip, where M-18 bounds what a courtesy renderer may do with a payload it verifies). Suite is the gate for use of the protocol name/mark.
