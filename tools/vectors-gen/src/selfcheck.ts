@@ -6,8 +6,11 @@
  *      canonicalization, commitment hashes, signatures, derivation.
  *   3. Replay every transition vector through the reference verifier and require that each
  *      INVALID case is actually rejected, with the recorded reason.
+ *   4. Replay the §6.7 addressing vectors: the hub-signed inbox record must be rejected
+ *      (M-17), and the out-of-band bootstrap payload must survive encode → decode with its
+ *      signature intact while a tampered copy of it must not.
  *
- * Step 3 is the one that matters most: it is what proves the negative vectors are real.
+ * Steps 3 and 4 are the ones that matter most: they are what prove the negative vectors are real.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -17,6 +20,14 @@ import { buildAll, VECTORS_ROOT } from './generate.js';
 import { canonicalize, type Json } from './jcs.js';
 import { digestHex, derivePersona, mnemonicToSeed, toHex, verifyObject, fromHex } from './crypto.js';
 import { verifyChain } from './transitions.js';
+import {
+  decodeOob,
+  encodeOob,
+  payloadFromOobUrl,
+  sameObject,
+  verifyInboxRecord,
+  type InboxRecord,
+} from './addressing.js';
 import type { Assertion, Edge } from './protocol.js';
 
 let failures = 0;
@@ -194,6 +205,124 @@ for (const [rel, kind] of [
     }
   }
   console.log(`   ${v.cases.length} ${kind} cases replayed`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('7. Inbox records replayed through the reference verifier (§6.7, M-17)');
+// ---------------------------------------------------------------------------
+{
+  const v = readVector('addressing/inbox-records.json');
+  const knownKeys = v.known_keys.map((k: any) => ({ label: k.label, personaId: k.persona_id }));
+
+  for (const c of v.cases) {
+    const { sig: _sig, ...unsigned } = c.record;
+    check(canonicalize(unsigned as Json) === c.canonical, `inbox/${c.name}: canonical form`);
+
+    const outcome = verifyInboxRecord(c.record as InboxRecord, knownKeys);
+    check(
+      outcome.accepted === c.expected.accepted,
+      `inbox/${c.name}: accepted=${c.expected.accepted}`,
+      outcome.accepted === c.expected.accepted ? undefined : `got accepted=${outcome.accepted}`,
+    );
+    const gotReason = outcome.accepted ? null : (outcome.reason ?? null);
+    check(
+      gotReason === c.expected.rejection_reason,
+      `inbox/${c.name}: rejection reason`,
+      gotReason === c.expected.rejection_reason
+        ? undefined
+        : `expected ${c.expected.rejection_reason}, got ${gotReason}`,
+    );
+    check(
+      (outcome.signerLabel ?? null) === c.expected.actual_signer,
+      `inbox/${c.name}: actual signer identified`,
+    );
+
+    // A verifier holding no known keys must still reach the same accept/reject decision;
+    // known_keys sharpens the reason, it never rescues a bad record.
+    const blind = verifyInboxRecord(c.record as InboxRecord, []);
+    check(
+      blind.accepted === c.expected.accepted,
+      `inbox/${c.name}: same decision with no known keys`,
+    );
+  }
+
+  // M-17 stated as an executable property, not a description.
+  const hubSigned = v.cases.find((c: any) => c.name === 'invalid-signed-by-hub');
+  check(!!hubSigned, 'inbox: hub-signed negative case present');
+  check(
+    !!hubSigned && verifyInboxRecord(hubSigned.record as InboxRecord, knownKeys).accepted === false,
+    'inbox: M-17 — a record signed by a hub key instead of the persona key is REJECTED',
+  );
+  check(
+    !!hubSigned && hubSigned.record.persona !== hubSigned.signed_by.persona_id,
+    'inbox: the hub-signed case really does name a different persona than its signer',
+  );
+  check(
+    typeof v.hub_queue_ttl?.recommended_minimum === 'string' &&
+      v.hub_queue_ttl.recommended_minimum_seconds === 2592000,
+    'inbox: hub queue TTL boundary constant is recorded (fixture only, no clock test)',
+  );
+  console.log(`   ${v.cases.length} inbox records replayed`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('8. Out-of-band bootstrap payload round-trip (§6.7)');
+// ---------------------------------------------------------------------------
+{
+  const v = readVector('addressing/oob-bootstrap.json');
+  const original = v.cases.find((c: any) => c.name === 'propose-roundtrip');
+  check(!!original, 'oob: round-trip case present');
+
+  for (const c of v.cases) {
+    check(canonicalize(c.message as Json) === c.canonical, `oob/${c.name}: canonical form`);
+
+    // encode → URL → decode, recomputed rather than trusted.
+    check(encodeOob(c.message as Json) === c.payload_b64url, `oob/${c.name}: base64url payload`);
+    const fragment = payloadFromOobUrl(c.url);
+    check(fragment === c.payload_b64url, `oob/${c.name}: URL fragment carries the payload`);
+    const decoded = decodeOob(fragment!);
+    check(sameObject(decoded, c.message as Json), `oob/${c.name}: decode(encode(m)) == m`);
+
+    // The payload is self-contained: verification uses only what the URL carried.
+    const verified = verifyObject(
+      decoded as Record<string, Json>,
+      (decoded as any).sig,
+      fromHex(c.sender.persona_id),
+    );
+    check(
+      verified === c.signature_verifies,
+      `oob/${c.name}: signature_verifies=${c.signature_verifies}`,
+      verified === c.signature_verifies ? undefined : `got ${verified}`,
+    );
+
+    check(
+      sameObject((decoded as any).payload.edge, (original.message as any).payload.edge) ===
+        c.edge_equals_original,
+      `oob/${c.name}: edge_equals_original=${c.edge_equals_original}`,
+    );
+    check(
+      sameObject(decoded, original.message as Json) === c.decoded_equals_original,
+      `oob/${c.name}: decoded_equals_original=${c.decoded_equals_original}`,
+    );
+  }
+
+  // The negative control has to be a real one: same signature, different edge.
+  const tampered = v.cases.find((c: any) => c.name === 'tampered-payload-does-not-verify');
+  check(!!tampered, 'oob: tampered negative case present');
+  check(
+    !!tampered && tampered.message.sig === original.message.sig,
+    'oob: the tampered payload reuses the original signature (otherwise it proves nothing)',
+  );
+  check(
+    !!tampered &&
+      !verifyObject(
+        tampered.message as Record<string, Json>,
+        tampered.message.sig,
+        fromHex(tampered.sender.persona_id),
+      ),
+    'oob: a tampered bootstrap payload is REJECTED by signature verification',
+  );
+  console.log(`   ${v.cases.length} bootstrap payloads replayed`);
 }
 
 // ---------------------------------------------------------------------------

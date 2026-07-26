@@ -28,6 +28,8 @@ const MAPPING: { vector: string; schema: string }[] = [
   { vector: 'derivation/persona-keys.json', schema: 'derivation.schema.json' },
   { vector: 'transitions/valid.json', schema: 'transitions.schema.json' },
   { vector: 'transitions/invalid.json', schema: 'transitions.schema.json' },
+  { vector: 'addressing/inbox-records.json', schema: 'addressing-inbox.schema.json' },
+  { vector: 'addressing/oob-bootstrap.json', schema: 'addressing-oob.schema.json' },
 ];
 
 const readJson = (p: string) => JSON.parse(readFileSync(p, 'utf8'));

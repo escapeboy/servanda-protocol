@@ -15,6 +15,8 @@ signatures/signatures.json          5 cases   Ed25519 over sha256(JCS(obj sans s
 derivation/persona-keys.json        5 personas BIP-39 → SLIP-0010 m/7391'/{i}'
 transitions/valid.json              7 cases   sequences a node MUST accept
 transitions/invalid.json           19 cases   sequences a node MUST reject (M-14)
+addressing/inbox-records.json       4 cases   §6.7 inbox records; hub-signed record rejected (M-17)
+addressing/oob-bootstrap.json       2 cases   §6.7 URL/QR bootstrap payload, encode→decode→verify
 schema/*.schema.json                          JSON Schemas, validated in CI
 ```
 
@@ -35,6 +37,13 @@ requires reading the generator to understand.
 - **transitions** — feed `assertions` to your verifier in order against `edge`. Each
   `expected_outcomes[i]` states whether that assertion is accepted and, if not, why.
   `expected_final_state` is the state after the whole chain.
+- **addressing/inbox-records** — verify each `record` against the key named in its own `persona`
+  field (§1.2: the persona_id *is* the public key). `known_keys` exists only so a verifier can
+  report *which* other key signed a rejected record; a verifier without it still rejects, as
+  `invalid-signature`. `hub_queue_ttl` is a fixture constant, not a test — see below.
+- **addressing/oob-bootstrap** — base64url-decode the URL fragment, parse, and verify the
+  signature against `sender.persona_id` using nothing else. `decoded_equals_original` and
+  `edge_equals_original` are the round-trip assertions.
 
 > ⚠️ **`derivation/persona-keys.json` contains private keys.** They derive from published BIP-39
 > test mnemonics (all-zero and all-`0x7f` entropy) and are public knowledge. Never use them for
@@ -55,6 +64,27 @@ every positive test. The 19 negative cases exist so that failure is loud. They i
 - an owner recording tacit acceptance *before* the acceptance window elapsed
 - supersession double-signed by one party instead of both
 
+## The addressing negatives say the same thing about §6.7
+
+`addressing/inbox-records.json` carries one case that matters more than the other three: an inbox
+record naming Alice as its `persona`, listing a hub she never chose, and signed by a **hub's** key.
+§6.7 — *"Only the persona key may change its own hubs (a hub cannot 'move' its users)"* — and M-17
+make it invalid. Accepting it would let any hub silently redirect another hub's users, which is
+edge forgery moved from the ledger to the address book. The check that refuses it is one line and
+needs no registry, because the persona_id is the verifying key.
+
+`addressing/oob-bootstrap.json` pairs the round-trip with a payload whose `owed_to` was swapped
+while keeping the original signature. It base64url-decodes and JSON-parses perfectly — neither
+says anything about authenticity — and MUST fail verification. A courtesy renderer (§6.7, M-18)
+that skips that check is a phishing surface rather than a renderer: a signed payload arriving over
+an untrusted channel proves who signed it, never that the channel or the rendering page is
+trustworthy.
+
+**No time-travel test for hub TTL.** §6.7 recommends hubs queue for ≥ 30 days; the constant is
+recorded in `hub_queue_ttl` and never asserted against a clock. Generation is clockless by rule,
+and TTL expiry is not a correctness boundary anyway — §6.7 makes a lost queued message harmless,
+because reconciliation (§6.4), not delivery, is the guarantee.
+
 ## Interpretations the generator had to make
 
 The spec is DRAFT v0.1-pre and under-specified in the places below. The generator picks a concrete
@@ -71,6 +101,8 @@ repository issue, and whichever way an issue resolves, the vectors change with i
 | 6 | §4.3 `disputed → closed` "both parties" | Both parties must assert `closed`; one alone does not close |
 | 7 | §4.5 supersession must reference the successor `edge_id`, but the §4.2 assertion schema has **no field able to carry it** | Verified only as "both parties asserted `superseded`". The successor link is unverifiable as specified |
 | 8 | Signing preimage stated across two sections | `ed25519_sign(sha256(JCS(object minus "sig")), key)` |
+| 9 | §6.7 says the out-of-band `propose` travels "in a URL/QR" but fixes no serialization | `base64url(JCS(message))`, unpadded, carried in the URL **fragment** so the payload never reaches a courtesy renderer's server |
+| 10 | §6.7 `hubs` is an array and senders "SHOULD retry across declared hubs" — array order is not defined as a priority order | The vectors fix only that a multi-hub record is valid; no ordering semantics are asserted |
 
 Item 7 is a genuine internal contradiction, not merely a gap: §4.5 states a requirement the wire
 format cannot express.
