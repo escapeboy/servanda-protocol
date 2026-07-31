@@ -1,18 +1,27 @@
-SUPERSEDED — this file is retained only so existing links resolve.
+RELICENSED GOING FORWARD — this file is retained so existing links resolve,
+and so the change of terms is on the record rather than inferred from a
+deletion.
 
 The Servanda Protocol specification text (spec/ and the prose of this
-repository) was previously offered under CC-BY-4.0. As of the v0.1-pre
-resolutions it is licensed under Apache-2.0, the same license as the
+repository) was previously offered under CC-BY-4.0. From the v0.1-pre
+resolutions onward it is offered under Apache-2.0, the same license as the
 tooling, the test vectors, and the reference implementation.
 
 See LICENSE for the full text.
 
-Rationale: one license across the specification, the conformance suite
-and the reference implementation removes the question of which grant
-covers a file that is partly prose and partly a generated artifact —
-the vectors are both. Apache-2.0's explicit patent grant is the reason
-to prefer it over CC-BY-4.0 for a protocol whose normative text and its
-executable half are the same deliverable.
+That earlier grant is not withdrawn, and could not be: CC-BY-4.0 section
+2(a)(1) grants a perpetual, irrevocable license. Anyone who received this
+specification under CC-BY-4.0 keeps it under CC-BY-4.0, for that copy,
+forever. What changes is the offer made to everyone from here on. A
+specification whose subject is that agreements bind the party that signed
+them does not get to make an exception for its own license.
+
+Rationale for the change: one license across the specification, the
+conformance suite and the reference implementation removes the question of
+which grant covers a file that is partly prose and partly a generated
+artifact — the vectors are both. Apache-2.0's explicit patent grant is the
+reason to prefer it over CC-BY-4.0 for a protocol whose normative text and
+its executable half are the same deliverable.
 
 The protocol name and mark are reserved (ADR-0001) and are not licensed
 by this grant. Trademark clearance has NOT been performed.
