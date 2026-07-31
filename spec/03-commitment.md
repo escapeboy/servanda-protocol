@@ -21,14 +21,17 @@
 - `owed_to: null` → reflexive commitment. Never leaves the vault.
 - `owed_to` as `external_label` (string, not a key) → counterparty off-network; record stays vault-local (half-network case).
 - `due: null` is valid and expected to be the majority. Undated commitments MUST NOT time-escalate; they rank by age × blocking (informative: docs/execution).
+- `created_at` is set by the owner's node and is part of the `commitment_hash` preimage (§3.2). It is the owner's value, not a negotiated one: a counterparty MUST take `created_at` from the commitment it was given and MUST NOT substitute its own observation of when the commitment arrived. A counterparty that never receives the plaintext (M-7) never learns `created_at` at all and verifies only the digest it was sent.
 
 ## 3.2 Commitment hash (the wire identity of the promise)
 
 ```
-commitment_hash = sha256( JCS({ intent, owner, owed_to, due, created_at }) )
+commitment_hash = sha256( "servanda/0.1:commitment_hash" || 0x00
+                          || JCS({ intent, owner, owed_to, due, created_at }) )
 ```
 
-- **Only these five fields.** Evidence, confidence, source are vault-local and excluded — two parties agreeing on a promise need not share evidence sets.
+- **Only these five fields.** Evidence, confidence, source are vault-local and excluded — two parties agreeing on a promise need not share evidence sets. `conditions` is excluded too: it holds `edge_id` values (§3.1), which are references to other edges rather than content of this promise, and the dependency a counterparty needs to see is carried on the edge as `blocked_by` (§4.1). The consequence is real and intended: "I'll do X" and "I'll do X once you deliver Y" hash identically.
+- **Domain separation.** The preimage is the octets `servanda/0.1:commitment_hash`, then a single `0x00`, then the JCS form of exactly the five members above (§0). The tag is what makes a `commitment_hash` a statement about a commitment: without it, the same five values hashed for any other purpose would yield the same digest, and a digest alone would not establish what was hashed. Implementations MUST NOT compute this digest over the untagged canonical form.
 - The hash, not the object, appears in edges (ADR-0004). Plaintext lives only in party vaults.
 - Fan-out: one hash, many edges (§4.6).
 

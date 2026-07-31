@@ -75,5 +75,8 @@ By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 By contributing you agree that your contributions are licensed under:
 
-- [CC-BY-4.0](LICENSE-SPEC) for specification prose (`spec/`, repository documentation), and
-- [Apache-2.0](LICENSE) for tooling and vectors (`tools/`, `vectors/`).
+- [Apache-2.0](LICENSE), for everything: specification prose (`spec/`, repository documentation),
+  tooling and vectors (`tools/`, `vectors/`).
+
+The earlier split grant (CC-BY-4.0 for prose) is superseded; [LICENSE-SPEC](LICENSE-SPEC) is
+retained only as a pointer.

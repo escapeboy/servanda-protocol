@@ -51,7 +51,7 @@
     },
     {
       "name": "valid-self-signed-multi-hub",
-      "description": "Two declared hubs. §6.7 says senders SHOULD retry across declared hubs but does not define whether array order is a priority order — see the tracked issue. The vector fixes only that a multi-hub record is valid.",
+      "description": "Two declared hubs. §6.7 (as resolved) makes the declared order the priority order: a sender MUST attempt hubs[0] first and walk the list in order, and MUST NOT reorder it by its own latency or success measurements. The order is the persona's own statement about where it wants its mail.",
       "signed_by": {
         "label": "bob",
         "persona_id": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f"

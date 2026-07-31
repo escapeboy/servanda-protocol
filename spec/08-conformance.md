@@ -20,14 +20,19 @@
 - **M-16** A device key MUST NOT be sole custodian of vault content keys.
 - **M-17** Only the persona key may alter its inbox record: a record whose signature does not verify against the persona it names MUST be rejected. A hub cannot move its users.
 - **M-18** A courtesy renderer MUST NOT hold or use signing keys. It verifies and presents; confirmation is asserted from a node holding the persona's keys.
+- **M-19** Envelopes are bounded: a connector MUST NOT emit, and a node MUST NOT canonicalize, an envelope exceeding the §2 bounds. Exceeding input is clipped and marked, never silently truncated and never silently dropped.
+- **M-20** A node MUST NOT advertise an act the transition table does not authorize the requesting persona to sign in the item's current state, and MUST NOT bind an advertised act to a tool call that produces no assertion. A client MUST NOT invent a tool binding for an act the node reports as unbound.
+- **M-21** No user-facing copy crosses the node surface: a node MUST NOT supply display wording for a control, and a client MUST author the wording of every affordance it renders. A person's own recorded words are content, not copy, and are rendered verbatim.
 
 ## Conformance levels
 
-- **Node** (minimum): L0–L1 + §7 five tools + M-1..M-16.
+- **Node** (minimum): L0–L1 + §7 six tools + M-1..M-16, M-19, M-20.
 - **Federating node**: + §6 (one transport, recon, recovery responder).
 - **Hub**: §6.3 blind-courier requirements + M-11.
-- **Client**: §7 consumer + M-12 display rules.
+- **Client**: §7 consumer + M-12, M-20 and M-21 display rules.
 
 ## Conformance suite
 
-A public test suite defines "implements Servanda" (ADR-0001: whoever controls the definition of compatible controls the protocol). v0 suite scope: canonical-form vectors (JCS + hashing), signature vectors, transition-table property tests (invalid assertion rejection), visibility matrix tests, M-11 negative tests, §6.7 addressing vectors (M-17 negative test: an inbox record signed by a hub key rather than the persona key is rejected; out-of-band bootstrap payload round-trip, where M-18 bounds what a courtesy renderer may do with a payload it verifies). Suite is the gate for use of the protocol name/mark.
+A public test suite defines "implements Servanda" (ADR-0001: whoever controls the definition of compatible controls the protocol). v0 suite scope: canonical-form vectors (JCS + hashing), signature vectors, transition-table property tests (invalid assertion rejection), visibility matrix tests, M-11 negative tests, §6.7 addressing vectors (M-17 negative test: an inbox record signed by a hub key rather than the persona key is rejected; out-of-band bootstrap payload round-trip, where M-18 bounds what a courtesy renderer may do with a payload it verifies), §7 node-surface vectors (M-20 action advertisement and the `act` tool, M-12 verification-level ordering and its negative cases). Suite is the gate for use of the protocol name/mark.
+
+**What the suite cannot reach.** A vector pins what a node emits. It cannot inspect what a client paints, so the client halves of M-12 and M-21 — "MUST NOT render a display name above its evidence level", "a client MUST author the wording of every affordance it renders" — are prose obligations, not suite-enforced ones, until a client-side conformance harness exists. The node halves of both are covered by the node-surface vectors. M-19 is likewise unenforced by the suite: there is no envelope vector family, so the §2 envelope `id` preimage is currently untested. These are stated here rather than left to be discovered, per `GOVERNANCE.md`: a behaviour the suite does not cover is not yet a conformance requirement.

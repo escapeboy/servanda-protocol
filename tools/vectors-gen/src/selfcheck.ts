@@ -9,8 +9,11 @@
  *   4. Replay the §6.7 addressing vectors: the hub-signed inbox record must be rejected
  *      (M-17), and the out-of-band bootstrap payload must survive encode → decode with its
  *      signature intact while a tampered copy of it must not.
+ *   5. Replay the §7 node-surface vectors: an act the transition table does not authorize
+ *      must not be advertised (M-20), an `act` call it does not authorize must be refused,
+ *      and no display name may escape below verification level 2 (M-12).
  *
- * Steps 3 and 4 are the ones that matter most: they are what prove the negative vectors are real.
+ * Steps 3 to 5 are the ones that matter most: they are what prove the negative vectors are real.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -18,8 +21,26 @@ import { join } from 'node:path';
 
 import { buildAll, VECTORS_ROOT } from './generate.js';
 import { canonicalize, type Json } from './jcs.js';
-import { digestHex, derivePersona, mnemonicToSeed, toHex, verifyObject, fromHex } from './crypto.js';
+import {
+  digestHex,
+  derivePersona,
+  mnemonicToSeed,
+  sha256Hex,
+  toHex,
+  verifyObject,
+  fromHex,
+} from './crypto.js';
 import { verifyChain } from './transitions.js';
+import { DOMAIN_TAG, domainSeparated, edgeId } from './protocol.js';
+import {
+  ACT_TOOL,
+  ACT_VOCABULARY,
+  LEVEL_ORDER,
+  actionsFor,
+  evaluateAct,
+  grade,
+  type Act,
+} from './node-surface.js';
 import {
   decodeOob,
   encodeOob,
@@ -87,6 +108,10 @@ console.log('3. commitment_hash vectors');
 {
   const v = readVector('hashing/commitment-hash.json');
   const fields: string[] = v.hashed_fields;
+  const tag: string = v.domain_tag.tag;
+  check(tag === DOMAIN_TAG.commitment_hash, 'hash: domain tag string is the one §0 fixes');
+  check(v.domain_tag.separator === '0x00', 'hash: domain tag separator is a single 0x00 octet');
+
   for (const c of v.cases) {
     const preimage: Record<string, Json> = {};
     for (const k of fields) preimage[k] = c.commitment[k];
@@ -95,7 +120,17 @@ console.log('3. commitment_hash vectors');
       canonicalize(preimage as Json) === c.hash_preimage_canonical,
       `hash/${c.name}: preimage canonical form`,
     );
-    check(digestHex(preimage as Json) === c.commitment_hash, `hash/${c.name}: hash value`);
+
+    // Rebuilt from the tag and the canonical form, not copied from the generator.
+    const tagged = domainSeparated(tag, new TextEncoder().encode(c.hash_preimage_canonical));
+    check(toHex(tagged) === c.hash_preimage_hex, `hash/${c.name}: domain-tagged preimage octets`);
+    check(sha256Hex(tagged) === c.commitment_hash, `hash/${c.name}: hash value`);
+
+    // The tag has to be load-bearing: the untagged digest MUST NOT be the recorded one.
+    check(
+      digestHex(preimage as Json) !== c.commitment_hash,
+      `hash/${c.name}: untagged digest differs (domain separation is real)`,
+    );
 
     const equalsBase = c.commitment_hash === v.base_commitment_hash;
     check(
@@ -166,6 +201,21 @@ for (const [rel, kind] of [
 ] as const) {
   const v = readVector(rel);
   for (const c of v.cases) {
+    // §4.1 as resolved: the edge_id is recomputed from the four values, domain-tagged.
+    const e = c.edge as Edge;
+    check(
+      edgeId(e.commitment_hash, e.owner, e.owed_to, e.proposed_at) === e.edge_id,
+      `${kind}/${c.name}: edge_id recomputes from its domain-tagged preimage`,
+    );
+    check(
+      sha256Hex(
+        new TextEncoder().encode(
+          e.commitment_hash + e.owner + e.owed_to + e.proposed_at,
+        ),
+      ) !== e.edge_id,
+      `${kind}/${c.name}: the untagged concatenation does NOT produce this edge_id`,
+    );
+
     const result = verifyChain(c.edge as Edge, c.assertions as Assertion[]);
 
     check(
@@ -323,6 +373,162 @@ console.log('8. Out-of-band bootstrap payload round-trip (§6.7)');
     'oob: a tampered bootstrap payload is REJECTED by signature verification',
   );
   console.log(`   ${v.cases.length} bootstrap payloads replayed`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('9. Node-surface vectors replayed (§7; M-20, M-14)');
+// ---------------------------------------------------------------------------
+{
+  const v = readVector('node-surface/actions.json');
+  for (const c of v.cases) {
+    // The effective state is re-derived, never trusted from the file.
+    const chain = verifyChain(c.edge as Edge, c.assertions as Assertion[]);
+    check(
+      chain.finalState === c.effective_state,
+      `actions/${c.name}: effective state re-derives from the chain`,
+      chain.finalState === c.effective_state
+        ? undefined
+        : `expected ${c.effective_state}, got ${chain.finalState}`,
+    );
+
+    const got = actionsFor(
+      c.edge as Edge,
+      chain.finalState,
+      c.viewer.persona_id,
+      c.window_elapsed,
+    );
+    check(
+      JSON.stringify(got) === JSON.stringify(c.expected_actions),
+      `actions/${c.name}: advertised actions`,
+      `expected ${JSON.stringify(c.expected_actions)}, got ${JSON.stringify(got)}`,
+    );
+
+    // M-20 stated as a property: nothing in must_not_advertise may appear, and every act
+    // that IS advertised must carry the binding §7 fixes for it.
+    for (const forbidden of c.must_not_advertise) {
+      check(
+        !got.some((a) => a.act === forbidden),
+        `actions/${c.name}: "${forbidden}" is NOT advertised (M-20)`,
+      );
+    }
+    for (const a of got) {
+      check(
+        a.tool === ACT_TOOL[a.act as Act],
+        `actions/${c.name}: "${a.act}" binds to the tool §7 names`,
+      );
+      check(
+        a.tool !== null || Object.keys(a.args).length === 0,
+        `actions/${c.name}: unbound act "${a.act}" carries no args`,
+      );
+    }
+    check(
+      got.length + c.must_not_advertise.length === ACT_VOCABULARY.length,
+      `actions/${c.name}: advertised + must_not_advertise covers the whole vocabulary`,
+    );
+  }
+
+  // The two cases that differ only by the window flag must differ in their arrays — otherwise
+  // the time-sensitive half of M-20 is not being tested at all.
+  const before = v.cases.find((c: any) => c.name === 'pending-acceptance-owner-window-not-elapsed');
+  const after = v.cases.find((c: any) => c.name === 'pending-acceptance-owner-window-elapsed');
+  check(!!before && !!after, 'actions: the window-elapsed pair is present');
+  check(
+    !!before && !before.expected_actions.some((a: any) => a.act === 'done'),
+    'actions: `done` is NOT advertised before the acceptance window elapses',
+  );
+  check(
+    !!after && after.expected_actions.some((a: any) => a.act === 'done'),
+    'actions: `done` IS advertised once the window has elapsed',
+  );
+  console.log(`   ${v.cases.length} action cases replayed`);
+}
+
+{
+  const v = readVector('node-surface/act-tool.json');
+  for (const c of v.cases) {
+    const chain = verifyChain(c.edge as Edge, c.assertions as Assertion[]);
+    check(
+      chain.finalState === c.effective_state,
+      `act/${c.name}: effective state re-derives from the chain`,
+    );
+
+    const outcome = evaluateAct(
+      c.edge as Edge,
+      chain.finalState,
+      c.call.caller.persona_id,
+      c.call.input.act as Act,
+      c.call.input.evidence_hash,
+      c.window_elapsed,
+    );
+    check(outcome.accepted === c.expected.accepted, `act/${c.name}: accepted=${c.expected.accepted}`);
+    const reason = outcome.accepted ? null : (outcome.reason ?? null);
+    check(
+      reason === c.expected.rejection_reason,
+      `act/${c.name}: rejection reason`,
+      reason === c.expected.rejection_reason
+        ? undefined
+        : `expected ${c.expected.rejection_reason}, got ${reason}`,
+    );
+    check(
+      (outcome.asserts ?? null) === c.expected.asserts,
+      `act/${c.name}: the assertion the node would sign`,
+    );
+  }
+
+  // The two rejections that would each silently break a real guarantee.
+  const releaseByOwner = v.cases.find((c: any) => c.name === 'release-by-owner-rejected');
+  check(
+    !!releaseByOwner && releaseByOwner.expected.accepted === false,
+    'act: an owner CANNOT release their own debt (§4.3 "owed_to alone")',
+  );
+  const unbound = v.cases.filter((c: any) => c.expected.rejection_reason === 'act-not-bound-to-a-tool');
+  check(
+    unbound.length >= 3,
+    'act: every act §7 declares unbound is refused by the `act` tool (M-20)',
+  );
+  console.log(`   ${v.cases.length} act-tool cases replayed`);
+}
+
+{
+  const v = readVector('node-surface/verification-levels.json');
+  check(
+    JSON.stringify(v.level_order) === JSON.stringify(LEVEL_ORDER),
+    'levels: the total order is 0 < 1 < ext < 2 < 3',
+  );
+  for (let i = 1; i < v.level_order.length; i++) {
+    check(
+      v.level_rank[v.level_order[i - 1]] < v.level_rank[v.level_order[i]],
+      `levels: rank(${v.level_order[i - 1]}) < rank(${v.level_order[i]})`,
+    );
+  }
+
+  for (const c of v.cases) {
+    const got = grade(c.evidence);
+    check(got.level === c.expected.level, `levels/${c.name}: achieved level`,
+      got.level === c.expected.level ? undefined : `expected ${c.expected.level}, got ${got.level}`);
+    check(
+      got.display_name === c.expected.display_name,
+      `levels/${c.name}: display_name`,
+      got.display_name === c.expected.display_name
+        ? undefined
+        : `expected ${JSON.stringify(c.expected.display_name)}, got ${JSON.stringify(got.display_name)}`,
+    );
+    // M-12 as an executable property, over every case rather than the ones that mean to test it.
+    check(
+      got.display_name === null || got.level === '2' || got.level === '3',
+      `levels/${c.name}: no name escapes below level 2 (M-12)`,
+    );
+  }
+
+  // The case the ordering decides, and the case a name would leak from.
+  const both = v.cases.find((c: any) => c.name === 'level-2-outranks-ext');
+  check(!!both && both.expected.level === '2', 'levels: an attestation outranks a binding proof');
+  const leak = v.cases.find((c: any) => c.name === 'negative-name-not-shown-at-ext');
+  check(
+    !!leak && leak.evidence.attestedDisplayName !== null && leak.expected.display_name === null,
+    'levels: a name available in the data is NOT emitted at `ext`',
+  );
+  console.log(`   ${v.cases.length} verification-level cases replayed`);
 }
 
 // ---------------------------------------------------------------------------

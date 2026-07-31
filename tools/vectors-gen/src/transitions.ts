@@ -27,7 +27,8 @@ export type RejectionReason =
   | 'expiry-before-due'
   | 'acceptance-window-not-elapsed'
   | 'implicit-transition-not-assertable'
-  | 'duplicate-assertion-by-same-party';
+  | 'duplicate-assertion-by-same-party'
+  | 'malformed-edge-acceptance-window';
 
 export interface AssertionOutcome {
   index: number;
@@ -112,6 +113,16 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
 }
 
 function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason | null {
+  // §4.1 (as resolved): acceptance_window is non-null iff closure_policy is on-acceptance.
+  // There is no default. A malformed edge accepts no assertions at all — not merely the
+  // closure ones — because the member decides when silence becomes consent.
+  if (
+    (edge.closure_policy === 'on-acceptance') !==
+    (edge.acceptance_window !== null)
+  ) {
+    return 'malformed-edge-acceptance-window';
+  }
+
   if (a.edge_id !== edge.edge_id) return 'edge-id-mismatch';
 
   // Signature must verify under the key named in `by` — this also catches an assertion
@@ -227,9 +238,9 @@ function evaluateClosure(
   // st.state === 'pending-acceptance'
   if (isOwedTo) return null; // explicit accept
 
-  // Owner recording tacit acceptance: only once the window has elapsed.
-  const window = edge.acceptance_window ?? 'P5D';
-  const expiresAt = addDuration(st.acceptanceWindowOpenedAt!, window);
+  // Owner recording tacit acceptance: only once the window has elapsed. No `?? 'P5D'`
+  // fallback — §4.1 makes a null window on an on-acceptance edge malformed, rejected above.
+  const expiresAt = addDuration(st.acceptanceWindowOpenedAt!, edge.acceptance_window!);
   if (Date.parse(a.asserted_at) < expiresAt) return 'acceptance-window-not-elapsed';
   return null;
 }
