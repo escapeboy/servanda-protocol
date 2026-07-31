@@ -3,10 +3,9 @@
  * Fixed test fixtures live here so every vector is reproducible from committed seeds.
  */
 
-import { canonicalize, type Json } from './jcs.js';
+import { canonicalBytes, canonicalize, type Json } from './jcs.js';
 import {
   derivePersona,
-  digestHex,
   mnemonicToSeed,
   signObject,
   sha256Hex,
@@ -14,6 +13,29 @@ import {
 } from './crypto.js';
 
 export const PROTOCOL_VERSION = 'servanda/0.1';
+
+/**
+ * spec/00-overview.md (Conventions) — identifier preimages are domain-separated.
+ *
+ * Every identifier the spec defines as a sha256 digest is computed over a preimage that
+ * begins with a fixed ASCII tag followed by a single 0x00 octet. The tag contains no 0x00,
+ * so it is self-delimiting. Signing preimages are NOT tagged.
+ */
+export const DOMAIN_TAG = {
+  commitment_hash: 'servanda/0.1:commitment_hash',
+  edge_id: 'servanda/0.1:edge_id',
+  envelope_id: 'servanda/0.1:envelope_id',
+} as const;
+
+/** tag || 0x00 || body — the exact byte layout §0 fixes. */
+export function domainSeparated(tag: string, body: Uint8Array): Uint8Array {
+  const tagBytes = new TextEncoder().encode(tag);
+  const out = new Uint8Array(tagBytes.length + 1 + body.length);
+  out.set(tagBytes, 0);
+  out[tagBytes.length] = 0x00;
+  out.set(body, tagBytes.length + 1);
+  return out;
+}
 
 /**
  * TEST SEEDS ONLY — these are published BIP-39 test vectors (all-zero and all-0x7f
@@ -75,8 +97,17 @@ export function commitmentHashPreimage(c: Commitment): Record<string, Json> {
   };
 }
 
+/**
+ * spec/03-commitment.md §3.2 (as resolved):
+ *   commitment_hash = sha256( "servanda/0.1:commitment_hash" || 0x00 || JCS(five fields) )
+ */
 export function commitmentHash(c: Commitment): string {
-  return digestHex(commitmentHashPreimage(c) as Json);
+  return sha256Hex(
+    domainSeparated(
+      DOMAIN_TAG.commitment_hash,
+      canonicalBytes(commitmentHashPreimage(c) as Json),
+    ),
+  );
 }
 
 export function canonicalCommitmentPreimage(c: Commitment): string {
@@ -84,12 +115,14 @@ export function canonicalCommitmentPreimage(c: Commitment): string {
 }
 
 /**
- * spec/04-edge.md §4.1:
- *   edge_id = sha256(commitment_hash || owner || owed_to || proposed_at)
+ * spec/04-edge.md §4.1 (as resolved):
+ *   edge_id = sha256( "servanda/0.1:edge_id" || 0x00
+ *                     || utf8(commitment_hash) || utf8(owner) || utf8(owed_to) || utf8(proposed_at) )
  *
- * INTERPRETATION (the spec does not define the concatenation encoding — see
- * vectors/README.md and the tracked issue): `||` is taken as concatenation of the four
- * values' UTF-8 bytes, in the listed order, with no separator and no length prefix.
+ * `||` between the four values is octet concatenation with no separator and no length
+ * prefix; each value contributes the UTF-8 octets of its own textual form. This is now
+ * normative (§4.1) rather than an interpretation. The first three values are fixed-width
+ * 64-octet lowercase hex, so the concatenation is unambiguous.
  */
 export function edgeId(
   commitment_hash: string,
@@ -97,10 +130,10 @@ export function edgeId(
   owed_to: string,
   proposed_at: string,
 ): string {
-  const preimage = new TextEncoder().encode(
+  const body = new TextEncoder().encode(
     commitment_hash + owner + owed_to + proposed_at,
   );
-  return sha256Hex(preimage);
+  return sha256Hex(domainSeparated(DOMAIN_TAG.edge_id, body));
 }
 
 export interface Edge {
@@ -145,7 +178,8 @@ export function makeEdge(opts: {
     proposed_at: opts.proposed_at,
     due: opts.due ?? null,
     closure_policy,
-    // §4.1 "required iff on-acceptance; default P5D"
+    // §4.1 (as resolved): non-null iff on-acceptance, null otherwise. There is no default —
+    // the member is never absent, so a default would never apply.
     acceptance_window:
       opts.acceptance_window !== undefined
         ? opts.acceptance_window

@@ -81,7 +81,7 @@ export const FOREIGN_EDGE_ID = makeEdge({
 const EV = evidenceHash('pr#341 merged; 11 tests');
 
 /** Shorthands for the two opening assertions every non-trivial chain needs. */
-const proposed = (edge: Edge): Assertion =>
+export const proposed = (edge: Edge): Assertion =>
   makeAssertion({
     edge_id: edge.edge_id,
     state: 'proposed',
@@ -89,7 +89,7 @@ const proposed = (edge: Edge): Assertion =>
     signer: ALICE,
   });
 
-const confirmed = (edge: Edge): Assertion =>
+export const confirmed = (edge: Edge): Assertion =>
   makeAssertion({
     edge_id: edge.edge_id,
     state: 'confirmed',
@@ -518,8 +518,9 @@ export const INVALID_CASES: TransitionCase[] = [
   {
     name: 'explicit-open-assertion',
     description:
-      'INTERPRETATION-dependent: §4.3 marks confirmed → open as "(implicit)" with no authorized ' +
-      'signer, so an explicit `open` assertion has no row permitting it. See the tracked ambiguity issue.',
+      '§4.3: the confirmed → open transition is implicit and no row authorizes any signer to ' +
+      'produce it, so an assertion whose `state` is `open` violates the table and MUST be ' +
+      'discarded under M-14. Normative as of v0.1-pre; formerly an interpretation.',
     edge: EDGE_ACCEPTANCE,
     assertions: [
       proposed(EDGE_ACCEPTANCE),
@@ -626,5 +627,58 @@ export const INVALID_CASES: TransitionCase[] = [
     ],
     expected: [null, null, null, 'duplicate-assertion-by-same-party'],
     expectedFinalState: 'open',
+  },
+  {
+    name: 'on-acceptance-edge-with-null-window',
+    description:
+      '§4.1: acceptance_window MUST be non-null iff closure_policy is on-acceptance, and there ' +
+      'is no default. A null window on an on-acceptance edge is malformed and the edge accepts ' +
+      'no assertions at all — treating null as "no window" would let the owner record tacit ' +
+      'acceptance instantly, which is the exact forgery §4.4 exists to prevent.',
+    edge: makeEdge({
+      commitment_hash: COMMITMENT_HASH,
+      owner: ALICE.personaId,
+      owed_to: BOB.personaId,
+      proposed_at: T_PROPOSED,
+      due: T_DUE,
+      closure_policy: 'on-acceptance',
+      acceptance_window: null,
+    }),
+    assertions: [
+      makeAssertion({
+        edge_id: edgeWith('on-acceptance').edge_id,
+        state: 'proposed',
+        asserted_at: T_PROPOSED,
+        signer: ALICE,
+      }),
+    ],
+    expected: ['malformed-edge-acceptance-window'],
+    expectedFinalState: 'none',
+  },
+  {
+    name: 'on-evidence-edge-with-non-null-window',
+    description:
+      '§4.1, the other direction: an acceptance_window on an on-evidence edge is meaningless and ' +
+      'MUST be null. A verifier that tolerates it accepts an edge whose closure rule and closure ' +
+      'timing disagree about which policy is in force.',
+    edge: makeEdge({
+      commitment_hash: COMMITMENT_HASH,
+      owner: ALICE.personaId,
+      owed_to: BOB.personaId,
+      proposed_at: T_PROPOSED,
+      due: T_DUE,
+      closure_policy: 'on-evidence',
+      acceptance_window: 'P5D',
+    }),
+    assertions: [
+      makeAssertion({
+        edge_id: edgeWith('on-evidence').edge_id,
+        state: 'proposed',
+        asserted_at: T_PROPOSED,
+        signer: ALICE,
+      }),
+    ],
+    expected: ['malformed-edge-acceptance-window'],
+    expectedFinalState: 'none',
   },
 ];

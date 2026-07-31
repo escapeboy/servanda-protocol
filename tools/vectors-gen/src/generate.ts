@@ -14,6 +14,7 @@ import {
   ALICE,
   BOB,
   CAROL,
+  DOMAIN_TAG,
   HUB_OPERATOR,
   ORG_MNEMONIC,
   ORG_ROOT,
@@ -56,6 +57,17 @@ import {
   type TransitionCase,
 } from './cases-transitions.js';
 import { verifyChain } from './transitions.js';
+import { ACT_CASES, ACTIONS_CASES, LEVEL_CASES } from './cases-node-surface.js';
+import {
+  ACT_TOOL,
+  ACT_VOCABULARY,
+  LEVEL_ORDER,
+  LEVEL_RANK,
+  actionsFor,
+  evaluateAct,
+  grade,
+  roleOf,
+} from './node-surface.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VECTORS_ROOT = join(HERE, '..', '..', '..', 'vectors');
@@ -112,6 +124,10 @@ export function buildHashing() {
       commitment: c as unknown as Json,
       hash_preimage: commitmentHashPreimage(c) as Json,
       hash_preimage_canonical: canonicalCommitmentPreimage(c),
+      hash_preimage_hex:
+        toHex(new TextEncoder().encode(DOMAIN_TAG.commitment_hash)) +
+        '00' +
+        toHex(new TextEncoder().encode(canonicalCommitmentPreimage(c))),
       commitment_hash: commitmentHash(c),
       same_hash_as_base: sameHashAsBase,
     };
@@ -202,11 +218,21 @@ export function buildHashing() {
   }
 
   return {
-    ...banner('spec/03-commitment.md §3.2'),
+    ...banner('spec/03-commitment.md §3.2, spec/00-overview.md (domain separation)'),
     description:
-      'commitment_hash = sha256(JCS({intent, owner, owed_to, due, created_at})). Cases with ' +
-      'same_hash_as_base=true prove that no other field of the commitment object reaches the hash.',
+      'commitment_hash = sha256("servanda/0.1:commitment_hash" || 0x00 || ' +
+      'JCS({intent, owner, owed_to, due, created_at})). Cases with same_hash_as_base=true prove ' +
+      'that no other field of the commitment object reaches the hash. `hash_preimage_hex` is the ' +
+      'complete preimage as octets, tag and separator included, so the domain tag is checkable ' +
+      'without reconstructing it.',
     hashed_fields: ['intent', 'owner', 'owed_to', 'due', 'created_at'],
+    domain_tag: {
+      tag: DOMAIN_TAG.commitment_hash,
+      separator: '0x00',
+      note:
+        '§0: identifier preimages are domain-separated by a fixed ASCII tag followed by one 0x00 ' +
+        'octet. The tag contains no 0x00, so it is self-delimiting. Signing preimages are NOT tagged.',
+    },
     base_commitment_hash: baseHash,
     cases,
   };
@@ -466,9 +492,10 @@ export function buildAddressingInbox() {
     ),
     record(
       'valid-self-signed-multi-hub',
-      'Two declared hubs. §6.7 says senders SHOULD retry across declared hubs but does not ' +
-        'define whether array order is a priority order — see the tracked issue. The vector ' +
-        'fixes only that a multi-hub record is valid.',
+      'Two declared hubs. §6.7 (as resolved) makes the declared order the priority order: a ' +
+        'sender MUST attempt hubs[0] first and walk the list in order, and MUST NOT reorder it ' +
+        'by its own latency or success measurements. The order is the persona\'s own statement ' +
+        'about where it wants its mail.',
       {
         persona: BOB.personaId,
         hubs: ['https://hub.example/servanda', 'https://backup.hub.example/servanda'],
@@ -647,6 +674,159 @@ export function buildAddressingOob() {
   };
 }
 
+// ---------------------------------------------------------------------------
+// §7 node surface — M-20 (advertised acts, the `act` tool) and M-12 (the ladder)
+// ---------------------------------------------------------------------------
+
+/** The act → tool binding, emitted once per file so a consumer never has to infer it. */
+function actTable() {
+  return ACT_VOCABULARY.map((act) => ({ act, tool: ACT_TOOL[act] }));
+}
+
+export function buildNodeSurfaceActions() {
+  const cases = ACTIONS_CASES.map((c) => {
+    const chain = verifyChain(c.edge, c.assertions);
+    const actions = actionsFor(c.edge, chain.finalState, c.viewer.persona_id, c.window_elapsed);
+
+    // A case whose chain does not fully apply would silently test the wrong state.
+    if (chain.rejectedCount !== 0) {
+      throw new Error(`actions case "${c.name}": its assertion chain is not fully accepted`);
+    }
+    // M-20, asserted inside the builder: an advertised act must be one the table authorizes.
+    for (const a of actions) {
+      if (!ACT_VOCABULARY.includes(a.act)) {
+        throw new Error(`actions case "${c.name}": "${a.act}" is not in the §7 vocabulary`);
+      }
+      if (a.tool !== ACT_TOOL[a.act]) {
+        throw new Error(`actions case "${c.name}": "${a.act}" advertised with the wrong tool`);
+      }
+      if (a.tool === null && Object.keys(a.args).length !== 0) {
+        throw new Error(`actions case "${c.name}": "${a.act}" is unbound but carries args`);
+      }
+    }
+
+    return {
+      name: c.name,
+      description: c.description,
+      edge: c.edge as unknown as Json,
+      assertions: c.assertions as unknown as Json,
+      viewer: { ...c.viewer, role: roleOf(c.edge, c.viewer.persona_id) },
+      effective_state: chain.finalState,
+      window_elapsed: c.window_elapsed,
+      expected_actions: actions as unknown as Json,
+      /** Every act NOT advertised here, so the negative half is explicit rather than implied. */
+      must_not_advertise: ACT_VOCABULARY.filter((a) => !actions.some((x) => x.act === a)),
+    };
+  });
+
+  return {
+    ...banner('spec/07-node-surface.md (open_loops, brief), conformance M-20'),
+    description:
+      'For a given edge, assertion chain and viewing persona, the exact `actions` array a node ' +
+      'MUST return. `must_not_advertise` is the complement: advertising any of those acts for ' +
+      'that item and that viewer is an M-20 violation. `window_elapsed` is an input, never a ' +
+      'clock read — generation is clockless, and the flag is exactly what decides whether the ' +
+      'owner may yet record tacit acceptance (§4.3).',
+    act_vocabulary: ACT_VOCABULARY,
+    act_tool_bindings: actTable(),
+    cases,
+  };
+}
+
+export function buildNodeSurfaceActTool() {
+  const cases = ACT_CASES.map((c) => {
+    const chain = verifyChain(c.edge, c.assertions);
+    const outcome = evaluateAct(
+      c.edge,
+      chain.finalState,
+      c.caller.persona_id,
+      c.act,
+      c.evidence_hash,
+      c.window_elapsed,
+    );
+    return {
+      name: c.name,
+      description: c.description,
+      edge: c.edge as unknown as Json,
+      assertions: c.assertions as unknown as Json,
+      effective_state: chain.finalState,
+      call: {
+        caller: { ...c.caller, role: roleOf(c.edge, c.caller.persona_id) },
+        tool: 'act',
+        input: { id: c.edge.edge_id, act: c.act, evidence_hash: c.evidence_hash },
+      },
+      window_elapsed: c.window_elapsed,
+      expected: {
+        accepted: outcome.accepted,
+        rejection_reason: outcome.accepted ? null : (outcome.reason ?? null),
+        asserts: outcome.asserts ?? null,
+      },
+    };
+  });
+
+  if (!cases.some((c) => !c.expected.accepted)) {
+    throw new Error('act-tool vectors: the negative half is missing');
+  }
+
+  return {
+    ...banner('spec/07-node-surface.md (act), spec/04-edge.md §4.3, conformance M-14 / M-20'),
+    description:
+      'One `act` call against one edge in a known state. `act` is the only §7 tool that signs ' +
+      'an assertion, so every call here is verified against the §4.3 transition table BEFORE ' +
+      'anything is recorded — a rejected call leaves no trace in the chain. The rejections are ' +
+      'the substance: a `release` accepted from the owner hands the protocol\'s one unilateral ' +
+      'act to the wrong party.',
+    act_tool_bindings: actTable(),
+    cases,
+  };
+}
+
+export function buildNodeSurfaceLevels() {
+  const cases = LEVEL_CASES.map((c) => {
+    const graded = grade(c.evidence);
+    return {
+      name: c.name,
+      description: c.description,
+      evidence: c.evidence as unknown as Json,
+      expected: {
+        level: graded.level,
+        display_name: graded.display_name,
+        name_bearing: graded.display_name !== null,
+      },
+    };
+  });
+
+  // The ordering is the thing being pinned; assert it rather than trusting the map.
+  LEVEL_ORDER.forEach((l, i) => {
+    if (i > 0 && LEVEL_RANK[LEVEL_ORDER[i - 1]] >= LEVEL_RANK[l]) {
+      throw new Error(`level order broken at ${LEVEL_ORDER[i - 1]} < ${l}`);
+    }
+  });
+  for (const c of cases) {
+    if (c.expected.name_bearing && c.expected.level !== '2' && c.expected.level !== '3') {
+      throw new Error(`level case "${c.name}": a name escaped below level 2 — M-12 violation`);
+    }
+  }
+
+  return {
+    ...banner('spec/01-identity.md §1.6, conformance M-12'),
+    description:
+      'The verification ladder as a total order, and the rule that a display name travels only ' +
+      'at the levels an org attestation establishes. Each case gives an evidence set and the ' +
+      'level plus display_name a node MUST report. The negative cases are where a name is ' +
+      'available in the surrounding data and MUST NOT be emitted, because the achieved level ' +
+      'does not carry it.',
+    level_order: LEVEL_ORDER,
+    level_rank: LEVEL_RANK as unknown as Json,
+    ordering_note:
+      '§1.6: 0 < 1 < ext < 2 < 3. `ext` outranks continuity and is outranked by an attestation ' +
+      '— a binding proof is the persona\'s own signature on a channel it controls, which is ' +
+      'self-assertion, whereas an attestation is a third party staking its own key.',
+    name_bearing_levels: ['2', '3'],
+    cases,
+  };
+}
+
 export interface GeneratedFile {
   path: string;
   content: string;
@@ -662,6 +842,12 @@ export function buildAll(): GeneratedFile[] {
     { path: 'transitions/invalid.json', content: serialize(buildTransitionsInvalid()) },
     { path: 'addressing/inbox-records.json', content: serialize(buildAddressingInbox()) },
     { path: 'addressing/oob-bootstrap.json', content: serialize(buildAddressingOob()) },
+    { path: 'node-surface/actions.json', content: serialize(buildNodeSurfaceActions()) },
+    { path: 'node-surface/act-tool.json', content: serialize(buildNodeSurfaceActTool()) },
+    {
+      path: 'node-surface/verification-levels.json',
+      content: serialize(buildNodeSurfaceLevels()),
+    },
   ];
 }
 
