@@ -80,8 +80,8 @@ lives here, and none is required to read the spec.
 - An implementation claims conformance by passing the conformance suite (§8) — the vectors here plus
   the property tests that grow alongside them. The suite, not a blessed codebase, is the definition
   of "implements Servanda".
-- The reference implementation is a separate repository (not yet published). Its license is still
-  open ([#4](../../issues/4)); the spec text is CC-BY-4.0 and the tooling here is Apache-2.0.
+- The reference implementation is a separate repository (not yet published). Everything — spec text,
+  tooling, vectors, and the reference implementation — is Apache-2.0.
 - Reference-impl-only requirements (trust gradient, autonomy ceilings — §9.4) are explicitly **not**
   wire-protocol matters. Do not implement them to be conformant; implement them to use the brand.
 
@@ -100,8 +100,11 @@ The fastest useful contributions right now:
 
 ## License
 
-- Specification text (`spec/`, and the prose of this repository): [CC-BY-4.0](LICENSE-SPEC)
-- Tooling and test vectors (`tools/`, `vectors/`): [Apache-2.0](LICENSE)
+[Apache-2.0](LICENSE) throughout: specification text (`spec/`, and the prose of this repository),
+tooling and test vectors (`tools/`, `vectors/`), and the reference implementation.
+[LICENSE-SPEC](LICENSE-SPEC) is retained only as a pointer — the earlier CC-BY-4.0 grant on the
+prose is superseded.
 
-The protocol name and mark are reserved (ADR-0001) pending [#1](../../issues/1). Passing the
-conformance suite is the intended gate for using them.
+The protocol name and mark are reserved (ADR-0001). **Trademark clearance has not been performed**
+([#1](../../issues/1)) — the name "Servanda" is provisional and this blocks going public. Passing
+the conformance suite is the intended gate for using the mark once it is cleared.
