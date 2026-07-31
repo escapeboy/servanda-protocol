@@ -1,9 +1,12 @@
 # Servanda Protocol — Specification v0 (draft)
 
-**Status:** DRAFT v0.1-pre · 2026-07-25 · not frozen, pre-review
-**Name:** Servanda — from *pacta sunt servanda* ("agreements must be kept").
+**Status:** DRAFT v0.1-pre · 2026-07-27 · not frozen, pre-review
+**Name:** Servanda — from *pacta sunt servanda* ("agreements must be kept"). The name is
+provisional: it is descriptive Latin in the public domain, but **no trademark clearance has been
+performed**, and clearance is a blocker on publishing this specification.
 **Editors:** N. Katsarov
-**License:** spec text CC-BY-4.0 (protocol name trademark reserved, ADR-0001)
+**License:** Apache-2.0, for this specification and for the reference implementation (protocol name
+mark reserved, ADR-0001; see [LICENSE](../LICENSE))
 
 ## Abstract
 
@@ -21,6 +24,10 @@ An open protocol for commitments: typed, evidenced, cryptographically owned reco
 8. [08-conformance.md](08-conformance.md) — consolidated MUSTs, conformance levels
 9. [09-threat-model.md](09-threat-model.md) — normative security appendix
 
+Informative appendices (not normative, not part of the conformance suite):
+
+- [Appendix A — Servanda edges and W3C Verifiable Credentials](../docs/appendix-a-vc-mapping.md)
+
 ## Conventions
 
 - Key words MUST / MUST NOT / SHOULD / MAY per RFC 2119.
@@ -28,6 +35,16 @@ An open protocol for commitments: typed, evidenced, cryptographically owned reco
 - All hashes SHA-256 unless stated; hex-encoded lowercase.
 - All signatures Ed25519 over the SHA-256 of the canonical form.
 - Canonical JSON per RFC 8785 (JCS). Any object with a defined schema has exactly one canonical byte representation; hashes and signatures are computed over it.
+- **Signing preimage.** The preimage of every signature is `sha256(JCS(O))`, where `O` is the object with every member whose name is `sig` or begins with `sig_` removed. A single-signature object carries exactly one member, `sig`. A multi-signature object carries one `sig_<role>` member per required signer; every signer therefore signs identical bytes, and each signature MUST be verified against the key its role names. An object MUST NOT be treated as signed unless every signature its schema declares as required verifies.
+- **Identifier preimages are domain-separated.** Every identifier this specification defines as a SHA-256 digest is computed over a preimage that begins with a domain tag: a fixed ASCII string followed by a single `0x00` octet. The tag contains no `0x00`, so it is self-delimiting, and the octets after it are the construction the defining section states. The three tags are:
+
+  | Identifier | Domain tag (ASCII, then `0x00`) | Defined in |
+  |---|---|---|
+  | `commitment_hash` | `servanda/0.1:commitment_hash` | §3.2 |
+  | `edge_id` | `servanda/0.1:edge_id` | §4.1 |
+  | envelope `id` | `servanda/0.1:envelope_id` | §2 |
+
+  Signing preimages are **not** domain-separated: a signature is bound to its object by that object's own `type` and `v` members, which are inside the canonical form. Implementations MUST NOT add a domain tag to a signing preimage.
 - `layer: vault` objects never leave the owner's vault. `layer: wire` objects may cross node boundaries.
 - Protocol version string: `servanda/0.1`. Every wire message carries `v`.
 
@@ -41,3 +58,42 @@ L0  Vault (sovereign local store: commitments, expectations, evidence) (§3)
 ```
 
 Base rule (constitution §9): L0–L1 MUST be fully functional with no network, no server, no second participant. L2 is additive.
+
+## Change note — the one preimage change (v0.1-pre)
+
+Domain separation (the Conventions bullet above) changes **every** identifier preimage in the
+protocol: `commitment_hash` (§3.2), `edge_id` (§4.1, which derives from `commitment_hash`), and the
+envelope `id` (§2). Every identifier computed under any earlier draft is invalid and cannot be
+migrated — an identifier is what parties have already signed against, so recomputing it is not a
+migration but a new identity.
+
+This is taken deliberately, once, now:
+
+- After freeze it is not available at all. There is no deployed data to migrate today, and there
+  will be after freeze.
+- Hashing a canonical JSON form with no type tag lets two object types in principle share a
+  preimage. A digest alone then does not establish what was hashed.
+
+**This is the only preimage change in this revision.** Every other resolution considered for
+v0.1-pre that would have altered a hash or signing preimage was rejected specifically so that the
+break happens exactly once:
+
+- `edge_id` keeps its four-value preimage; the edge body is bound on first sight instead (§4.1).
+- `conditions` is **not** added to the `commitment_hash` preimage (§3.2).
+- The §4.2 assertion object gains no `supersedes_with` member (§4.5).
+- `pending-acceptance` is a computed state, never an assertion's `state` value (§4.3).
+- The `||` encoding of the `edge_id` preimage is ratified exactly as implemented (§4.1).
+
+Anything that would change a preimage again is now a v0.2 matter.
+
+## Gates on the v0.1 freeze
+
+These are not spec edits. They are open items that MUST be closed before this specification is
+frozen; a frozen v0.1 that leaves any of them open ships an unreviewed cryptographic assumption.
+
+- **Cryptographic review of the Ed25519 → X25519 birational map (§6.3) and of the Argon2id
+  parameters (§1.7, §9).** Neither has been reviewed by a cryptographer. The map's safety depends
+  on how the same key material is used across two schemes, and the Argon2id parameters are not
+  stated anywhere in this repository as concrete values. This gate cannot be discharged by the
+  editors.
+- **Trademark clearance of the name "Servanda"** (see the header). Not performed.
