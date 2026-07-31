@@ -444,6 +444,52 @@ console.log('9. Node-surface vectors replayed (§7; M-20, M-14)');
 }
 
 {
+  // §7 brief slots — M-21's node half. The check is a REFERENCE JUDGE, not a re-read of the
+  // file's own verdict: each slot is judged from the rule, and the judgement compared to what the
+  // case claims. Reading `expected.valid` and agreeing with it would prove only that JSON parses.
+  const v = readVector('node-surface/brief-slots.json');
+  const ALLOWED = new Set(v.slot_members as string[]);
+  const VOCAB = new Set(v.act_vocabulary as string[]);
+  // The table is a LIST of {act, tool}, not a map — read it as it is emitted rather than as it
+  // would be convenient, or the judge silently decides every act is unbound.
+  const BINDINGS = new Map(
+    (v.act_tool_bindings as { act: string; tool: string | null }[]).map((b) => [b.act, b.tool]),
+  );
+
+  const judge = (slot: Record<string, any>): string | null => {
+    for (const key of Object.keys(slot)) if (!ALLOWED.has(key)) return 'copy-bearing-member';
+    const pa = slot.primary_action;
+    if (pa === null || pa === undefined) return null;
+    for (const key of Object.keys(pa)) {
+      if (!['act', 'tool', 'args'].includes(key)) return 'copy-bearing-member';
+    }
+    if (!VOCAB.has(pa.act)) return 'act-not-in-vocabulary';
+    if (pa.tool !== BINDINGS.get(pa.act)) return 'tool-not-bound-to-act';
+    if (pa.tool === null && Object.keys(pa.args ?? {}).length > 0) return 'args-must-be-empty';
+    return null;
+  };
+
+  for (const c of v.cases) {
+    const reason = judge(c.slot as Record<string, any>);
+    check(
+      (reason === null) === c.expected.valid,
+      `brief/${c.name}: validity re-derives from the rule`,
+      (reason === null) === c.expected.valid ? undefined : `judged ${reason}, case says valid=${c.expected.valid}`,
+    );
+    check(
+      reason === c.expected.rejection_reason,
+      `brief/${c.name}: the reason re-derives too`,
+      reason === c.expected.rejection_reason ? undefined : `judged ${reason}, expected ${c.expected.rejection_reason}`,
+    );
+  }
+  check(
+    v.cases.some((c: any) => c.expected.rejection_reason === 'copy-bearing-member'),
+    'brief: a case pins the copy-bearing member #20 reported',
+  );
+  console.log(`   ${v.cases.length} brief-slot cases replayed`);
+}
+
+{
   const v = readVector('node-surface/act-tool.json');
   for (const c of v.cases) {
     const chain = verifyChain(c.edge as Edge, c.assertions as Assertion[]);
