@@ -73,7 +73,7 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VECTORS_ROOT = join(HERE, '..', '..', '..', 'vectors');
 
-const SUITE_VERSION = '0.1.0-pre';
+const SUITE_VERSION = '0.1.0';
 
 function banner(spec: string) {
   return {

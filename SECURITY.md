@@ -2,7 +2,11 @@
 
 ## Status of this protocol
 
-**The Servanda protocol has not been reviewed by an external cryptographer.** It is DRAFT v0.1-pre.
+**The Servanda protocol has not been reviewed by an external cryptographer.** v0.1 is frozen as of
+2026-08-01, and freezing is a statement about stability, not about assurance — the two freeze gates
+closed without a review being performed: the Ed25519 → X25519 birational map was *removed* rather
+than cleared (§6.3 is RFC 9180 HPKE over a persona's own X25519 key), and the Argon2id parameter
+set was *accepted by the editors*. §00 records which is which, and neither is a clearance.
 
 An external protocol security audit is planned before v1 and is a release gate (open questions,
 "External protocol security audit"). Until that audit completes, treat every cryptographic

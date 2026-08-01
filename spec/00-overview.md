@@ -1,6 +1,9 @@
 # Servanda Protocol — Specification v0 (draft)
 
-**Status:** DRAFT v0.1-pre · 2026-07-27 · not frozen, pre-review
+**Status:** v0.1 · FROZEN 2026-08-01 · conformance suite pinned at `0.1.0`
+Normative changes now require a minor bump to `servanda/0.2` (see [GOVERNANCE.md](../GOVERNANCE.md),
+Versioning). The pre-freeze exception that let normative text land without a bump ended with this
+line.
 **Name:** Servanda — from *pacta sunt servanda* ("agreements must be kept"). The name is settled
 and **no trademark will be registered** (#1). It is descriptive Latin in the public domain; no
 clearance search was run, so it is used without any claim that it is free of others' rights. The

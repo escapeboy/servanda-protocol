@@ -77,10 +77,14 @@ The protocol version string (`v` on every wire message) is `servanda/MAJOR.MINOR
 - **MAJOR bump** — reserved for post-v1 incompatible change.
 - **Editorial changes do not bump anything.** They are released as spec revisions dated in
   `spec/00-overview.md`.
-- **Pre-freeze exception:** while the status banner reads `DRAFT v0.x-pre`, normative changes may
-  land without a minor bump, because nothing is expected to be interoperating yet. The banner coming
-  off is the moment this exception ends. It is stated here so that its removal is a deliberate,
-  visible act.
+- **Pre-freeze exception — ENDED 2026-08-01.** While the status banner read `DRAFT v0.x-pre`,
+  normative changes could land without a minor bump, because nothing was expected to be
+  interoperating yet. The banner came off when v0.1 froze, which is the act this clause was written
+  to make deliberate and visible. It is kept here rather than deleted so that the rule which
+  governed every commit before that date remains legible.
+
+  Since the freeze: **a normative change requires `servanda/0.2`.** There is no longer a way to
+  alter normative text without moving the version a node reads off the wire.
 
 Every released version tags the repository and pins the vectors that define it.
 

@@ -2,9 +2,15 @@
 
 *Servanda — from* pacta sunt servanda *("agreements must be kept").*
 
-> **Status: DRAFT v0.1-pre — not frozen.**
-> Pre-review. No section is stable. Wire formats, hashes, and the transition table MAY change
-> without a compatibility path until v0.1 is tagged. Do not ship against this yet.
+> **Status: v0.1 — FROZEN (2026-08-01).**
+> Wire formats, hashes and the transition table are fixed for `servanda/0.1`. A normative change
+> now requires a minor bump to `servanda/0.2`; the `v` field on every wire message exists so a
+> node can refuse rather than misinterpret. The conformance suite in `vectors/` is pinned at
+> `0.1.0` and is what "implements Servanda" means (§8).
+>
+> **Frozen is not audited.** The cryptography has not been reviewed by an external cryptographer —
+> see [SECURITY.md](SECURITY.md), which is exact about which freeze gates closed by review, which
+> closed because the construction was removed, and which closed by editorial decision.
 > The protocol name is settled: "Servanda" is the name, and no trademark will be registered
 > ([#1](../../issues/1)).
 
