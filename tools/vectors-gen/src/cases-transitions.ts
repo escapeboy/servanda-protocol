@@ -14,6 +14,7 @@ import {
   evidenceHash,
   makeAssertion,
   makeEdge,
+  PROTOCOL_VERSION,
   type Assertion,
   type Commitment,
   type Edge,
@@ -33,7 +34,7 @@ export const T_DISPUTE_WINDOW_OPEN = '2026-09-01T12:00:00Z';
 export const T_AFTER_DISPUTE_WINDOW = '2026-09-02T12:00:01Z';
 
 const baseCommitment: Commitment = {
-  v: 'servanda/0.1',
+  v: PROTOCOL_VERSION,
   type: 'commitment',
   intent: 'Add integration tests for PaymentRetryService',
   owner: ALICE.personaId,
@@ -111,6 +112,26 @@ export interface TransitionCase {
 }
 
 export const VALID_CASES: TransitionCase[] = [
+  {
+    name: 'the-rule-is-per-signer-not-global',
+    description:
+      '§4.3 (v0.2, #38): two parties legitimately disagree about `now`, and neither is ' +
+      'authoritative over the other’s clock. A counterparty confirming at an instant EARLIER ' +
+      'than the owner’s proposal is honest clock skew, not backdating, and is accepted — the ' +
+      'rule compares a signer only against itself.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'confirmed',
+        asserted_at: '2026-07-25T08:59:59Z', // one second before ALICE proposed
+        signer: BOB,
+      }),
+    ],
+    expected: [null, null],
+    expectedFinalState: 'open',
+  },
   {
     name: 'on-acceptance-explicit-accept',
     description:
@@ -316,6 +337,63 @@ export const VALID_CASES: TransitionCase[] = [
 ];
 
 export const INVALID_CASES: TransitionCase[] = [
+  {
+    name: 'owner-backdates-to-manufacture-an-elapsed-acceptance-window',
+    description:
+      '§4.3 (v0.2, #38): the attack the monotonic rule exists for. Both windows in this spec are ' +
+      'measured between two `asserted_at` values written by the SAME party, so an owner could ' +
+      'mint evidence dated far in the past and a closure dated now, and a node computing the ' +
+      'window from those two timestamps would find it elapsed — on an edge the counterparty had ' +
+      'only ever confirmed. Nothing about the transition is illegal; the timestamps are the lie.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: evidenceHash('delivered'),
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_CONFIRMED, // before the owner's own evidence assertion
+        signer: ALICE,
+        evidence_hash: evidenceHash('delivered'),
+      }),
+    ],
+    expected: [null, null, null, 'asserted-at-before-signers-previous'],
+    expectedFinalState: 'pending-acceptance',
+  },
+  {
+    name: 'counterparty-backdates-a-dispute',
+    description:
+      '§4.3 (v0.2, #38): the same shape on the other side. A backdated `disputed` would start the ' +
+      'dispute window in the past and let the disputant assert `expired` immediately.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: evidenceHash('delivered'),
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'disputed',
+        asserted_at: T_PROPOSED, // before BOB's own `confirmed`
+        signer: BOB,
+        evidence_hash: evidenceHash('not as agreed'),
+      }),
+    ],
+    expected: [null, null, null, 'asserted-at-before-signers-previous'],
+    expectedFinalState: 'pending-acceptance',
+  },
   {
     name: 'proposed-by-owed-to',
     description:

@@ -29,7 +29,9 @@ export type RejectionReason =
   | 'dispute-window-not-elapsed'
   | 'implicit-transition-not-assertable'
   | 'duplicate-assertion-by-same-party'
-  | 'malformed-edge-acceptance-window';
+  | 'malformed-edge-acceptance-window'
+  /** v0.2 (#38): `asserted_at` is non-decreasing per signer within a chain. */
+  | 'asserted-at-before-signers-previous';
 
 export interface AssertionOutcome {
   index: number;
@@ -74,6 +76,16 @@ interface MutableState {
   disputedClosedBy: Set<string>;
   /** asserted_at of the accepted `disputed` assertion — when `dispute_window` starts running. */
   disputedAt: string | null;
+  /**
+   * The latest `asserted_at` accepted from each signer (§4.3, v0.2).
+   *
+   * Both windows in this spec are measured between two `asserted_at` values, and until v0.2 both
+   * could be written by the party the window constrains: an owner minting `closed` dated years
+   * back and `closed` dated now computed the window as elapsed on an edge the counterparty had
+   * only confirmed. Per-signer rather than global, because two parties legitimately disagree
+   * about `now` and neither is authoritative over the other's clock.
+   */
+  latestBySigner: Map<string, string>;
 }
 
 /**
@@ -102,6 +114,7 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
     supersededBy: new Set(),
     disputedClosedBy: new Set(),
     disputedAt: null,
+    latestBySigner: new Map(),
   };
 
   const outcomes: AssertionOutcome[] = [];
@@ -112,6 +125,7 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
       outcomes.push({ index, accepted: false, reason, stateAfter: st.state });
     } else {
       apply(edge, a, st);
+      st.latestBySigner.set(a.by, a.asserted_at);
       outcomes.push({ index, accepted: true, stateAfter: st.state });
     }
   });
@@ -125,6 +139,13 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
 }
 
 function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason | null {
+  // §4.3 (v0.2, #38): non-decreasing per signer. Checked FIRST, before the table, because a
+  // backdated assertion is not a transition error — the transition may be perfectly legal — and
+  // reporting it as `illegal-source-state` would hide what actually happened.
+  const previous = st.latestBySigner.get(a.by);
+  if (previous !== undefined && Date.parse(a.asserted_at) < Date.parse(previous)) {
+    return 'asserted-at-before-signers-previous';
+  }
   // §4.1 (as resolved): acceptance_window is non-null iff closure_policy is on-acceptance.
   // There is no default. A malformed edge accepts no assertions at all — not merely the
   // closure ones — because the member decides when silence becomes consent.

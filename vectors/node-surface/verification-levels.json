@@ -1,6 +1,6 @@
 {
-  "suite_version": "0.1.0",
-  "protocol_version": "servanda/0.1",
+  "suite_version": "0.2.0-pre",
+  "protocol_version": "servanda/0.2",
   "spec_reference": "spec/01-identity.md §1.6, conformance M-12",
   "generated_by": "tools/vectors-gen (deterministic; do not edit by hand)",
   "description": "The verification ladder as a total order, and the rule that a display name travels only at the levels an org attestation establishes. Each case gives an evidence set and the level plus display_name a node MUST report. The negative cases are where a name is available in the surrounding data and MUST NOT be emitted, because the achieved level does not carry it.",

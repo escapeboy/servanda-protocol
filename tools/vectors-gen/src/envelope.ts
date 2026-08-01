@@ -18,6 +18,15 @@ export const ENVELOPE_BOUNDS = {
   refs_entries: 32,
   ref_value_octets: 2048,
   actor_label_octets: 200,
+  /**
+   * v0.2 (#40). These three counted toward the canonical form while carrying no bound of their
+   * own, so a conforming connector could build an envelope that no clipping rule could rescue:
+   * every member it was permitted to clip was already inside its own limit. Reached from real
+   * input — a transcript line with a 100 KB `model` field landed unclipped in `external_id`.
+   */
+  actor_external_id_octets: 200,
+  source_octets: 200,
+  kind_octets: 200,
   payload_string_octets: 8192,
   canonicalizer_refusal_depth: 256,
 } as const;
@@ -358,6 +367,54 @@ export function buildEnvelopeBounds() {
       B.actor_label_octets + 1,
       false,
       { actor: { label: asciiOf(B.actor_label_octets + 1), external_id: '4412' } },
+    ),
+    boundCase(
+      'actor-external-id-at-the-limit',
+      `An external_id of exactly ${B.actor_external_id_octets} octets is inside the bound (v0.2, #40).`,
+      'actor_external_id_octets',
+      B.actor_external_id_octets,
+      true,
+      { actor: { label: 'octavia', external_id: asciiOf(B.actor_external_id_octets) } },
+    ),
+    boundCase(
+      'actor-external-id-over-the-limit',
+      'One octet more is outside it. In v0.1 this member had no bound at all.',
+      'actor_external_id_octets',
+      B.actor_external_id_octets + 1,
+      false,
+      { actor: { label: 'octavia', external_id: asciiOf(B.actor_external_id_octets + 1) } },
+    ),
+    boundCase(
+      'source-at-the-limit',
+      `A source of exactly ${B.source_octets} octets is inside the bound (v0.2, #40).`,
+      'source_octets',
+      B.source_octets,
+      true,
+      { source: asciiOf(B.source_octets) },
+    ),
+    boundCase(
+      'source-over-the-limit',
+      'One octet more is outside it.',
+      'source_octets',
+      B.source_octets + 1,
+      false,
+      { source: asciiOf(B.source_octets + 1) },
+    ),
+    boundCase(
+      'kind-at-the-limit',
+      `A kind of exactly ${B.kind_octets} octets is inside the bound (v0.2, #40).`,
+      'kind_octets',
+      B.kind_octets,
+      true,
+      { kind: asciiOf(B.kind_octets) },
+    ),
+    boundCase(
+      'kind-over-the-limit',
+      'One octet more is outside it.',
+      'kind_octets',
+      B.kind_octets + 1,
+      false,
+      { kind: asciiOf(B.kind_octets + 1) },
     ),
     boundCase(
       'payload-string-at-the-limit',

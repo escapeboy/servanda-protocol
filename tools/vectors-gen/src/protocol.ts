@@ -12,7 +12,7 @@ import {
   type Persona,
 } from './crypto.js';
 
-export const PROTOCOL_VERSION = 'servanda/0.1';
+export const PROTOCOL_VERSION = 'servanda/0.2';
 
 /**
  * spec/00-overview.md (Conventions) — identifier preimages are domain-separated.

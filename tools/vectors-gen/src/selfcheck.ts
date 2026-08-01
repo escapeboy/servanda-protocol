@@ -672,6 +672,9 @@ console.log('10. §2 envelope vectors (M-19, the id preimage)');
     ),
     payload_depth_below_payload: deepestLevel(e.payload, 0),
     canonical_form_octets: octets(canonicalize(e as Json)),
+    actor_external_id_octets: typeof e.actor.external_id === 'string' ? octets(e.actor.external_id) : 0,
+    source_octets: octets(e.source),
+    kind_octets: octets(e.kind),
   });
 
   for (const c of v.cases) {
