@@ -451,3 +451,117 @@ export const LEVEL_CASES: LevelCase[] = [
     evidence: ev({ domainAnchored: true, attestedDisplayName: 'Maria Ivanova' }),
   },
 ];
+
+/**
+ * §7 `brief` slots — M-21's node half, on the surface #20 was actually reported against.
+ *
+ * `open_loops` was already pinned; `brief` was not, so a node could ship slots carrying
+ * node-supplied copy and pass the whole suite. The positive cases derive their `primary_action`
+ * from the same `actionsFor` the actions family uses, so the two cannot disagree about what a
+ * node may advertise. The malformed ones are the substance: a positive-only family would not
+ * catch the regression it exists to prevent.
+ */
+export type SlotRejection =
+  | 'copy-bearing-member'
+  | 'act-not-in-vocabulary'
+  | 'tool-not-bound-to-act'
+  | 'args-must-be-empty';
+
+export interface BriefSlotCase {
+  name: string;
+  description: string;
+  /** Deliberately unshaped: a malformed slot is DATA here, not something a schema pre-filters. */
+  slot: Record<string, unknown>;
+  expected: { valid: boolean; rejection_reason: SlotRejection | null };
+}
+
+const ITEM = EDGE_ACCEPTANCE.edge_id;
+
+export const BRIEF_SLOT_CASES: BriefSlotCase[] = [
+  {
+    name: 'valid-owner-open-edge',
+    description:
+      'The owner of an open edge. `done` is the leading act that signs, so it is the primary ' +
+      'action; `headline` is the commitment intent as the person wrote it, which is CONTENT and ' +
+      'travels verbatim.',
+    slot: {
+      headline: 'pull staging data for the repro',
+      item_id: ITEM,
+      primary_action: { act: 'done', tool: 'act', args: { id: ITEM, act: 'done' } },
+    },
+    expected: { valid: true, rejection_reason: null },
+  },
+  {
+    name: 'valid-no-action-is-null-not-absent',
+    description:
+      'A slot with nothing a viewer may sign carries `primary_action: null`. Null says "nothing ' +
+      'to do here"; omitting the member would say "this node forgot", and a client cannot tell ' +
+      'those apart.',
+    slot: { headline: 'a promise already closed', item_id: ITEM, primary_action: null },
+    expected: { valid: true, rejection_reason: null },
+  },
+  {
+    name: 'invalid-label-on-the-primary-action',
+    description:
+      'THE case this family exists for. `label` is a node telling a client what to write on a ' +
+      'button, which is exactly what M-21 forbids and exactly the shape #20 reported. A slot ' +
+      'carrying one MUST be rejected.',
+    slot: {
+      headline: 'pull staging data for the repro',
+      item_id: ITEM,
+      primary_action: { act: 'done', tool: 'act', args: { id: ITEM, act: 'done' }, label: 'Mark done' },
+    },
+    expected: { valid: false, rejection_reason: 'copy-bearing-member' },
+  },
+  {
+    name: 'invalid-copy-on-the-slot',
+    description:
+      'Copy smuggled one level up. `headline` is the only string a slot may carry, because it is ' +
+      'the person’s own recorded words; anything else a node writes for a client to render is ' +
+      'the same violation wearing a different key.',
+    slot: {
+      headline: 'pull staging data for the repro',
+      item_id: ITEM,
+      subtitle: 'Overdue — act now',
+      primary_action: { act: 'done', tool: 'act', args: { id: ITEM, act: 'done' } },
+    },
+    expected: { valid: false, rejection_reason: 'copy-bearing-member' },
+  },
+  {
+    name: 'invalid-act-outside-the-vocabulary',
+    description:
+      'An act no client can map. The vocabulary is shared precisely so a client owns the wording ' +
+      'for every act it may meet; an act outside it forces the client either to invent copy or ' +
+      'to render something it cannot name.',
+    slot: {
+      headline: 'pull staging data for the repro',
+      item_id: ITEM,
+      primary_action: { act: 'nudge_harder', tool: 'act', args: { id: ITEM } },
+    },
+    expected: { valid: false, rejection_reason: 'act-not-in-vocabulary' },
+  },
+  {
+    name: 'invalid-unbound-act-named-a-tool',
+    description:
+      'M-20 at slot level: `supersede` binds to no tool in v0, so naming one advertises a call ' +
+      'that produces no assertion — a person told they acted when they did not.',
+    slot: {
+      headline: 'pull staging data for the repro',
+      item_id: ITEM,
+      primary_action: { act: 'supersede', tool: 'act', args: { id: ITEM } },
+    },
+    expected: { valid: false, rejection_reason: 'tool-not-bound-to-act' },
+  },
+  {
+    name: 'invalid-args-on-an-unbound-act',
+    description:
+      '`tool: null` means there is no call to make, so there are no arguments to make it with. ' +
+      'Arguments alongside a null tool are a call in waiting.',
+    slot: {
+      headline: 'pull staging data for the repro',
+      item_id: ITEM,
+      primary_action: { act: 'ping', tool: null, args: { id: ITEM } },
+    },
+    expected: { valid: false, rejection_reason: 'args-must-be-empty' },
+  },
+];

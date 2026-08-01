@@ -57,7 +57,7 @@ import {
   type TransitionCase,
 } from './cases-transitions.js';
 import { verifyChain } from './transitions.js';
-import { ACT_CASES, ACTIONS_CASES, LEVEL_CASES } from './cases-node-surface.js';
+import { ACT_CASES, ACTIONS_CASES, BRIEF_SLOT_CASES, LEVEL_CASES } from './cases-node-surface.js';
 import {
   ACT_TOOL,
   ACT_VOCABULARY,
@@ -733,6 +733,34 @@ export function buildNodeSurfaceActions() {
   };
 }
 
+export function buildNodeSurfaceBriefSlots() {
+  const cases = BRIEF_SLOT_CASES;
+
+  // A family whose negatives are missing is a family that cannot catch the regression it exists
+  // for — §7's `brief` shipped copy-bearing slots precisely while everything positive passed.
+  if (!cases.some((c) => !c.expected.valid)) {
+    throw new Error('brief-slot vectors: the negative half is missing');
+  }
+  if (!cases.some((c) => c.expected.rejection_reason === 'copy-bearing-member')) {
+    throw new Error('brief-slot vectors: no case pins the copy-bearing member #20 reported');
+  }
+
+  return {
+    ...banner('spec/07-node-surface.md (brief), conformance M-20 / M-21'),
+    description:
+      'One `brief` slot, and whether a node may emit it. M-21 says no user-facing copy crosses ' +
+      'the node surface: a client authors the wording of every control it renders, so a slot ' +
+      'carries an ACT and never a label. `headline` is the exception that proves it — a ' +
+      "person's own recorded words are content, not copy, and travel verbatim. The invalid " +
+      'cases are the substance: `open_loops` was already pinned while `brief` was not, so an ' +
+      'implementation could ship node-supplied button text and pass the entire suite.',
+    slot_members: ['headline', 'item_id', 'primary_action', 'persona'],
+    act_vocabulary: ACT_VOCABULARY,
+    act_tool_bindings: actTable(),
+    cases: cases as unknown as Json,
+  };
+}
+
 export function buildNodeSurfaceActTool() {
   const cases = ACT_CASES.map((c) => {
     const chain = verifyChain(c.edge, c.assertions);
@@ -843,6 +871,7 @@ export function buildAll(): GeneratedFile[] {
     { path: 'addressing/inbox-records.json', content: serialize(buildAddressingInbox()) },
     { path: 'addressing/oob-bootstrap.json', content: serialize(buildAddressingOob()) },
     { path: 'node-surface/actions.json', content: serialize(buildNodeSurfaceActions()) },
+    { path: 'node-surface/brief-slots.json', content: serialize(buildNodeSurfaceBriefSlots()) },
     { path: 'node-surface/act-tool.json', content: serialize(buildNodeSurfaceActTool()) },
     {
       path: 'node-surface/verification-levels.json',
