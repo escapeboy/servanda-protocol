@@ -648,10 +648,18 @@ console.log('10. §2 envelope vectors (M-19, the id preimage)');
     check(!!sides && sides.has(true) && sides.has(false), `bounds: ${bound} has a case on both sides`);
   }
 
-  const depthOf = (x: unknown): number =>
+  /**
+   * The level of the DEEPEST VALUE, counting `payload`'s own members as level 1.
+   *
+   * The first version of this counted containers and treated the scalar at the bottom of a chain
+   * as occupying no level, so it read 7 where §2 reads 8. It agreed with itself and disagreed with
+   * the reference implementation, which is exactly the disagreement replaying the vectors against
+   * a second reader is for.
+   */
+  const deepestLevel = (x: unknown, level: number): number =>
     x !== null && typeof x === 'object'
-      ? 1 + Math.max(0, ...Object.values(x as Record<string, unknown>).map(depthOf))
-      : 0;
+      ? Math.max(level, ...Object.values(x as Record<string, unknown>).map((v) => deepestLevel(v, level + 1)))
+      : level;
 
   /** Every bound measured at once, so a case can be checked against all of them, not just its own. */
   const measureAll = (e: any): Record<string, number> => ({
@@ -662,7 +670,7 @@ console.log('10. §2 envelope vectors (M-19, the id preimage)');
       0,
       ...Object.values(e.payload).filter((x): x is string => typeof x === 'string').map(octets),
     ),
-    payload_depth_below_payload: Math.max(0, ...Object.values(e.payload).map(depthOf)),
+    payload_depth_below_payload: deepestLevel(e.payload, 0),
     canonical_form_octets: octets(canonicalize(e as Json)),
   });
 

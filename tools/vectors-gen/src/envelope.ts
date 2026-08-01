@@ -379,11 +379,12 @@ export function buildEnvelopeBounds() {
     boundCase(
       'payload-depth-at-the-limit',
       `${B.payload_depth_below_payload} levels below \`payload\` itself is inside the bound. ` +
-        'Depth is counted from `payload`’s own members downwards, so `payload.nested` is level 1.',
+        'A level is the level of a VALUE: `payload.a = "x"` puts that string at level 1, so the ' +
+        'scalar at the bottom of a chain occupies a level like any other value.',
       'payload_depth_below_payload',
       B.payload_depth_below_payload,
       true,
-      { payload: { nested: nest(B.payload_depth_below_payload) } },
+      { payload: { nested: nest(B.payload_depth_below_payload - 1) } },
     ),
     boundCase(
       'payload-depth-over-the-limit',
@@ -391,7 +392,7 @@ export function buildEnvelopeBounds() {
       'payload_depth_below_payload',
       B.payload_depth_below_payload + 1,
       false,
-      { payload: { nested: nest(B.payload_depth_below_payload + 1) } },
+      { payload: { nested: nest(B.payload_depth_below_payload) } },
     ),
   ];
 

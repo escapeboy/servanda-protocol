@@ -576,7 +576,7 @@
     },
     {
       "name": "payload-depth-at-the-limit",
-      "description": "8 levels below `payload` itself is inside the bound. Depth is counted from `payload`’s own members downwards, so `payload.nested` is level 1.",
+      "description": "8 levels below `payload` itself is inside the bound. A level is the level of a VALUE: `payload.a = \"x\"` puts that string at level 1, so the scalar at the bottom of a chain occupies a level like any other value.",
       "bound": "payload_depth_below_payload",
       "measured": 8,
       "within_bounds": true,
@@ -599,9 +599,7 @@
                   "deeper": {
                     "deeper": {
                       "deeper": {
-                        "deeper": {
-                          "deeper": "leaf"
-                        }
+                        "deeper": "leaf"
                       }
                     }
                   }
@@ -649,9 +647,7 @@
                     "deeper": {
                       "deeper": {
                         "deeper": {
-                          "deeper": {
-                            "deeper": "leaf"
-                          }
+                          "deeper": "leaf"
                         }
                       }
                     }
