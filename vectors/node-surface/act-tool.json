@@ -40,6 +40,195 @@
   ],
   "cases": [
     {
+      "name": "done-from-disputed-refused",
+      "description": "§7 (v0.2, #41): `disputed` is not in the open family, and `done` from here would sign the owner’s half of a transition whose other half no advertised act can ever reach — a closure honestly recorded and permanently incomplete. §4.4’s exits from `disputed` are the two it names.",
+      "edge": {
+        "v": "servanda/0.2",
+        "type": "edge",
+        "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+        "commitment_hash": "9b1ac57fc1d466240ff28c10f70b74d5a9bf8344325b3130504955e7cd53cec5",
+        "owner": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+        "owed_to": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+        "proposed_at": "2026-07-25T09:00:00Z",
+        "due": "2026-08-01T00:00:00Z",
+        "closure_policy": "on-acceptance",
+        "acceptance_window": "P5D",
+        "blocked_by": [],
+        "supersedes": null
+      },
+      "assertions": [
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "proposed",
+          "asserted_at": "2026-07-25T09:00:00Z",
+          "by": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+          "evidence_hash": null,
+          "sig": "95b0d02d85057eddbcb45dee5ffe2e985d6f5521a2c01fcfac40fea76661c279ba41f464b96e6576671b0c12b4e87c0a6a185ccc15db831373ce197d1d02cd0e"
+        },
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "confirmed",
+          "asserted_at": "2026-07-25T10:00:00Z",
+          "by": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+          "evidence_hash": null,
+          "sig": "62e37ec7bc8591f916a5c85aba792c8bf42d2d3e7adfa53951c236eed53284adb2274c85e4d00f03715419336687d17305be08dc648b3aeb0607fad8b6738d08"
+        },
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "closed",
+          "asserted_at": "2026-08-02T12:00:00Z",
+          "by": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+          "evidence_hash": "b0dcb57992ddbbca584d976045d87aa31716c293c482f9fe93621f8e2176d6d8",
+          "sig": "a93279e6e2314ab31b2607ff7d7fe2208b0f7aefd2ca4f5efdc14d724b7af7d7d8971b214763a258ac4adc70c72d3abbdd2452007c8c1865248b8a0ab6fc980f"
+        },
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "disputed",
+          "asserted_at": "2026-08-03T12:00:00Z",
+          "by": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+          "evidence_hash": "c5df22f38e02aae0bf3b5ad1ac65164cce0c24d11a4bdf55ac0d5df5f4392e28",
+          "sig": "82ac2c4329277ada86a8cbf1ace064c5a12fd5c8f90a5813627e98a1e91565f2df6696e06c5b059b69a8a41e6b2474e14283722bfff03311002be348e6014c0d"
+        }
+      ],
+      "effective_state": "disputed",
+      "call": {
+        "caller": {
+          "label": "alice (owner)",
+          "persona_id": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+          "role": "owner"
+        },
+        "tool": "act",
+        "input": {
+          "id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "act": "done",
+          "evidence_hash": "b0dcb57992ddbbca584d976045d87aa31716c293c482f9fe93621f8e2176d6d8"
+        }
+      },
+      "window_elapsed": true,
+      "expected": {
+        "accepted": false,
+        "rejection_reason": "illegal-source-state",
+        "asserts": null
+      }
+    },
+    {
+      "name": "malformed-edge-says-which-member-is-malformed",
+      "description": "§7 (v0.2, #41): §4.1 requires `acceptance_window` non-null iff `closure_policy` is `on-acceptance`. Such an edge accepts nothing, and blaming the caller’s state for it tells them to fix something that is not wrong.",
+      "edge": {
+        "v": "servanda/0.2",
+        "type": "edge",
+        "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+        "commitment_hash": "9b1ac57fc1d466240ff28c10f70b74d5a9bf8344325b3130504955e7cd53cec5",
+        "owner": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+        "owed_to": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+        "proposed_at": "2026-07-25T09:00:00Z",
+        "due": "2026-08-01T00:00:00Z",
+        "closure_policy": "on-evidence",
+        "acceptance_window": "P5D",
+        "blocked_by": [],
+        "supersedes": null
+      },
+      "assertions": [],
+      "effective_state": "none",
+      "call": {
+        "caller": {
+          "label": "alice (owner)",
+          "persona_id": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+          "role": "owner"
+        },
+        "tool": "act",
+        "input": {
+          "id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "act": "done",
+          "evidence_hash": "b0dcb57992ddbbca584d976045d87aa31716c293c482f9fe93621f8e2176d6d8"
+        }
+      },
+      "window_elapsed": false,
+      "expected": {
+        "accepted": false,
+        "rejection_reason": "malformed-edge-acceptance-window",
+        "asserts": null
+      }
+    },
+    {
+      "name": "a-second-release-is-named-a-duplicate",
+      "description": "§7 (v0.2, #41): \"you already signed this one\" is not \"the transition is illegal\". A person told the latter about their own repeated act learns nothing they can act on.",
+      "edge": {
+        "v": "servanda/0.2",
+        "type": "edge",
+        "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+        "commitment_hash": "9b1ac57fc1d466240ff28c10f70b74d5a9bf8344325b3130504955e7cd53cec5",
+        "owner": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+        "owed_to": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+        "proposed_at": "2026-07-25T09:00:00Z",
+        "due": "2026-08-01T00:00:00Z",
+        "closure_policy": "on-acceptance",
+        "acceptance_window": "P5D",
+        "blocked_by": [],
+        "supersedes": null
+      },
+      "assertions": [
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "proposed",
+          "asserted_at": "2026-07-25T09:00:00Z",
+          "by": "a8a49af4e897c55abaab67d4933c14395d7a5d2ede1b4421981970468864351a",
+          "evidence_hash": null,
+          "sig": "95b0d02d85057eddbcb45dee5ffe2e985d6f5521a2c01fcfac40fea76661c279ba41f464b96e6576671b0c12b4e87c0a6a185ccc15db831373ce197d1d02cd0e"
+        },
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "confirmed",
+          "asserted_at": "2026-07-25T10:00:00Z",
+          "by": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+          "evidence_hash": null,
+          "sig": "62e37ec7bc8591f916a5c85aba792c8bf42d2d3e7adfa53951c236eed53284adb2274c85e4d00f03715419336687d17305be08dc648b3aeb0607fad8b6738d08"
+        },
+        {
+          "v": "servanda/0.2",
+          "type": "assertion",
+          "edge_id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "state": "released",
+          "asserted_at": "2026-08-02T12:00:00Z",
+          "by": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+          "evidence_hash": null,
+          "sig": "09ba10cdbc632726d58fc811fa1667da1dee4bdf92891386f2ced1ad42890968e461ccd48323129770d1dc088081e297d735940e12f00c8d88af54c276295600"
+        }
+      ],
+      "effective_state": "released",
+      "call": {
+        "caller": {
+          "label": "bob (owed_to)",
+          "persona_id": "72d2b4360c12a3be02c3dd4092410c18c18870985891e7a099d94a93e3b38c0f",
+          "role": "owed_to"
+        },
+        "tool": "act",
+        "input": {
+          "id": "141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a",
+          "act": "release",
+          "evidence_hash": null
+        }
+      },
+      "window_elapsed": false,
+      "expected": {
+        "accepted": false,
+        "rejection_reason": "terminal-state-reached",
+        "asserts": null
+      }
+    },
+    {
       "name": "done-by-owner-on-evidence",
       "description": "The base positive: owner, open edge, evidence present. Signs `closed`.",
       "edge": {
@@ -715,7 +904,7 @@
       "window_elapsed": true,
       "expected": {
         "accepted": false,
-        "rejection_reason": "illegal-source-state",
+        "rejection_reason": "terminal-state-reached",
         "asserts": null
       }
     },

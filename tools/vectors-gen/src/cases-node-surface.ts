@@ -201,6 +201,69 @@ const pendingChain = (edge: Edge) => [proposed(edge), confirmed(edge), ownerEvid
 
 export const ACT_CASES: ActCase[] = [
   {
+    name: 'done-from-disputed-refused',
+    description:
+      '§7 (v0.2, #41): `disputed` is not in the open family, and `done` from here would sign the ' +
+      'owner’s half of a transition whose other half no advertised act can ever reach — a ' +
+      'closure honestly recorded and permanently incomplete. §4.4’s exits from `disputed` are ' +
+      'the two it names.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      ...openChain(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'disputed',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+        evidence_hash: evidenceHash('not as agreed'),
+      }),
+    ],
+    caller: P_ALICE,
+    act: 'done',
+    evidence_hash: EV,
+    window_elapsed: true,
+  },
+  {
+    name: 'malformed-edge-says-which-member-is-malformed',
+    description:
+      '§7 (v0.2, #41): §4.1 requires `acceptance_window` non-null iff `closure_policy` is ' +
+      '`on-acceptance`. Such an edge accepts nothing, and blaming the caller’s state for it ' +
+      'tells them to fix something that is not wrong.',
+    edge: { ...EDGE_EVIDENCE, acceptance_window: 'P5D' },
+    assertions: [],
+    caller: P_ALICE,
+    act: 'done',
+    evidence_hash: EV,
+    window_elapsed: false,
+  },
+  {
+    name: 'a-second-release-is-named-a-duplicate',
+    description:
+      '§7 (v0.2, #41): "you already signed this one" is not "the transition is illegal". A person ' +
+      'told the latter about their own repeated act learns nothing they can act on.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      ...openChain(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'released',
+        asserted_at: T_EVIDENCE,
+        signer: BOB,
+      }),
+    ],
+    caller: P_BOB,
+    act: 'release',
+    evidence_hash: null,
+    window_elapsed: false,
+  },
+  {
     name: 'done-by-owner-on-evidence',
     description: 'The base positive: owner, open edge, evidence present. Signs `closed`.',
     edge: EDGE_EVIDENCE,
@@ -373,10 +436,40 @@ const ev = (patch: Partial<Evidence>): Evidence => ({
   attestation: false,
   domainAnchored: false,
   attestedDisplayName: null,
+  externalLabel: null,
   ...patch,
 });
 
 export const LEVEL_CASES: LevelCase[] = [
+  {
+    name: 'self-labelled-name-at-level-0-is-rendered',
+    description:
+      '§7 `counterparty.origin` (v0.2, #39). An `external_label` is a name the VIEWER typed for ' +
+      'someone off-network — level 0 by construction, and the only name that counterparty will ' +
+      'ever have. It is not evidence about anyone, so M-12 does not suppress it: a client that ' +
+      'hid it would erase the person from their own register and break the solo path M-10 ' +
+      'protects. v0.1 had no way to tell this apart from an attested name, which is why M-12’s ' +
+      'client half was unenforceable rather than merely untested.',
+    evidence: ev({ externalLabel: 'Georgi from the warehouse' }),
+  },
+  {
+    name: 'an-attested-name-outranks-the-viewers-own-label',
+    description:
+      'Both present at level 2. The attestation is evidence and the label is a private note, so ' +
+      'the attested name is what the node reports and its origin says so.',
+    evidence: ev({
+      attestation: true,
+      attestedDisplayName: 'Maria Ivanova',
+      externalLabel: 'the supplier',
+    }),
+  },
+  {
+    name: 'the-viewers-label-survives-a-level-that-carries-no-name',
+    description:
+      '`ext` outranks continuity and still carries no name — a binding proof binds a key to a ' +
+      'CHANNEL. The label is not promoted by the level and not suppressed by it either.',
+    evidence: ev({ bindingProof: true, externalLabel: 'Georgi from the warehouse' }),
+  },
   {
     name: 'level-0-no-evidence',
     description: 'No evidence of any kind. Level 0, and no name may be shown.',

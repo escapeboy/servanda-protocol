@@ -802,6 +802,7 @@ export function buildNodeSurfaceActTool() {
       c.act,
       c.evidence_hash,
       c.window_elapsed,
+      c.assertions,
     );
     return {
       name: c.name,
@@ -851,6 +852,8 @@ export function buildNodeSurfaceLevels() {
         level: graded.level,
         display_name: graded.display_name,
         name_bearing: graded.display_name !== null,
+        /** v0.2 (#39): what a client renders, and whether it is a claim about anyone. */
+        counterparty: graded.counterparty,
       },
     };
   });
@@ -862,6 +865,15 @@ export function buildNodeSurfaceLevels() {
     }
   });
   for (const c of cases) {
+    // #39's whole point: `attested` appears only where the level carries a name, and a
+    // `self-labelled` one is never suppressed. Without this the field would be emitted and
+    // nothing would depend on its value.
+    if (c.expected.counterparty?.origin === 'attested' && !c.expected.name_bearing) {
+      throw new Error(`levels case "${c.name}": attested counterparty at a non-name-bearing level`);
+    }
+    if (c.expected.name_bearing && c.expected.counterparty?.origin !== 'attested') {
+      throw new Error(`levels case "${c.name}": name-bearing level did not yield an attested name`);
+    }
     if (c.expected.name_bearing && c.expected.level !== '2' && c.expected.level !== '3') {
       throw new Error(`level case "${c.name}": a name escaped below level 2 — M-12 violation`);
     }

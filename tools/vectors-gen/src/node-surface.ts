@@ -154,7 +154,16 @@ export type ActRejection =
   | 'illegal-source-state'
   | 'evidence-hash-required'
   | 'evidence-hash-must-be-null'
-  | 'acceptance-window-not-elapsed';
+  | 'acceptance-window-not-elapsed'
+  /**
+   * v0.2 (#41). v0.1 fixed seven values while the §4.3 table produced fifteen, so eight distinct
+   * refusals reached the caller as the single word `illegal-source-state` — "the edge is over",
+   * "you already signed this one" and "the edge object is malformed" were indistinguishable. A
+   * tool whose contract is to refuse owes the caller a reason it can act on.
+   */
+  | 'terminal-state-reached'
+  | 'duplicate-assertion-by-same-party'
+  | 'malformed-edge-acceptance-window';
 
 export interface ActOutcome {
   accepted: boolean;
@@ -177,11 +186,29 @@ export function evaluateAct(
   act: Act,
   evidenceHash: string | null,
   windowElapsed: boolean,
+  /** The chain as it stands, so a repeat of the caller's own assertion is named as one. */
+  chain: readonly { by: string; state: string }[] = [],
 ): ActOutcome {
   const role = roleOf(edge, caller);
   if (role === 'non-party') return { accepted: false, reason: 'not-a-party' };
   if (ACT_TOOL[act] !== 'act') return { accepted: false, reason: 'act-not-bound-to-a-tool' };
 
+  // §4.1: acceptance_window is non-null iff closure_policy is on-acceptance. A malformed edge
+  // accepts nothing, and says which member is malformed rather than blaming the caller's state.
+  if ((edge.closure_policy === 'on-acceptance') !== (edge.acceptance_window !== null)) {
+    return { accepted: false, reason: 'malformed-edge-acceptance-window' };
+  }
+
+  // An edge that is over is over, whoever asks and whatever they ask for. Distinct from
+  // `illegal-source-state`, which says the transition is wrong for a LIVE edge — a person told
+  // "illegal source state" about a closed promise learns nothing they can act on.
+  if (state === 'closed' || state === 'released' || state === 'superseded' || state === 'expired') {
+    return { accepted: false, reason: 'terminal-state-reached' };
+  }
+
+  // §4.4 and §7 (v0.2): `disputed` is NOT in the open family. `done` from here would sign the
+  // owner's half of a transition whose other half no advertised act can reach, leaving a closure
+  // honestly recorded and permanently incomplete.
   const inOpenFamily = state === 'open' || state === 'pending-acceptance';
 
   if (act === 'done') {
@@ -198,6 +225,14 @@ export function evaluateAct(
   if (role !== 'owed_to') return { accepted: false, reason: 'wrong-role-for-act' };
   if (!inOpenFamily) return { accepted: false, reason: 'illegal-source-state' };
   if (evidenceHash !== null) return { accepted: false, reason: 'evidence-hash-must-be-null' };
+  // A repeat of `release` changes nothing and is named as a repeat. Deliberately NOT applied to
+  // `done`: under `on-acceptance` the owner signs `closed` twice by design — once to present
+  // evidence (which opens the window) and once after it elapses (§4.3, act 3). Treating that as a
+  // duplicate would refuse the very act the window exists to permit, which is what the selfcheck
+  // caught when this check was written symmetrically.
+  if (chain.some((a) => a.by === caller && a.state === 'released')) {
+    return { accepted: false, reason: 'duplicate-assertion-by-same-party' };
+  }
   return { accepted: true, asserts: 'released' };
 }
 
@@ -233,12 +268,28 @@ export interface Evidence {
   domainAnchored: boolean;
   /** The name the attestation claims, if any. Never reaches output below level 2. */
   attestedDisplayName: string | null;
+  /**
+   * §3.1 `external_label` — a name the VIEWER typed for an off-network counterparty (v0.2, #39).
+   *
+   * Level 0 by construction and the only name that counterparty will ever have. It is not
+   * evidence about anyone; it is the viewer's own note to themselves.
+   */
+  externalLabel?: string | null;
 }
 
 export interface GradedIdentity {
   level: Level;
   /** null wherever the level's evidence does not carry a name (§1.6, M-12). */
   display_name: string | null;
+  /**
+   * §7 `counterparty` (v0.2, #39): the name a client renders, and where it came from.
+   *
+   * `attested` MUST NOT be rendered above its level; `self-labelled` is rendered at any level,
+   * because a label you wrote yourself makes no claim about anyone. v0.1 emitted a bare string,
+   * so a client could satisfy M-12 only by suppressing both — destroying the offline path M-10
+   * protects — or neither. Every client chose neither.
+   */
+  counterparty: { value: string; origin: 'attested' | 'self-labelled' } | null;
 }
 
 export function achievedLevels(e: Evidence): Level[] {
@@ -258,5 +309,15 @@ export function grade(e: Evidence): GradedIdentity {
   // carries it. A binding proof binds a key to a CHANNEL, never to a name, so `ext` is not
   // name-bearing however high it ranks.
   const nameBearing = level === '2' || level === '3';
-  return { level, display_name: nameBearing ? e.attestedDisplayName : null };
+  const display_name = nameBearing ? e.attestedDisplayName : null;
+  // The attested name wins when the level carries one: it is evidence, and the viewer's own note
+  // is not. Below that level the label is what remains, and it is not suppressed — there is
+  // nothing to suppress it in favour of.
+  const counterparty: GradedIdentity['counterparty'] =
+    display_name !== null
+      ? { value: display_name, origin: 'attested' }
+      : e.externalLabel != null
+        ? { value: e.externalLabel, origin: 'self-labelled' }
+        : null;
+  return { level, display_name, counterparty };
 }
