@@ -453,13 +453,19 @@ export function buildAddressingInbox() {
     opts: {
       persona: string;
       hubs: string[];
+      /** Defaults to the SIGNER's key — which is what makes the hub-signed case an attack. */
+      dh_key?: string;
       issued_at: string;
       signer: typeof ALICE;
       signerLabel: string;
       corruptSignature?: boolean;
     },
   ) => {
-    const rec: InboxRecord = makeInboxRecord({ v: PROTOCOL_VERSION, ...opts });
+    const rec: InboxRecord = makeInboxRecord({
+      v: PROTOCOL_VERSION,
+      ...opts,
+      dh_key: opts.dh_key ?? toHex(opts.signer.dhPublicKey),
+    });
     const outcome = verifyInboxRecord(rec, ADDRESSING_KNOWN_KEYS);
     const { sig: _sig, ...unsigned } = rec;
     return {
@@ -506,11 +512,12 @@ export function buildAddressingInbox() {
     ),
     record(
       'invalid-signed-by-hub',
-      'THE negative case for M-17. The record names Alice as the persona but is signed by a ' +
-        'hub key, rewriting her hub list to a hub she never chose. §6.7: "Only the persona key ' +
-        'may change its own hubs (a hub cannot \'move\' its users)." A verifier that accepts ' +
-        'this lets any hub silently redirect another hub\'s users — the addressing equivalent ' +
-        'of forging an edge. MUST be rejected.',
+      'THE negative case for M-17, and it now carries a second attack in the same object. The ' +
+        'record names Alice but is signed by a hub key: it rewrites her hub list to a hub she ' +
+        'never chose, AND advertises a `dh_key` the hub holds the private half of. §6.7: "Only ' +
+        'the persona key may change its own hubs (a hub cannot \'move\' its users)." A verifier ' +
+        'that accepts this lets any hub redirect another hub\'s users — and, since §6.3 seals to ' +
+        'the key in this record, read everything addressed to them. MUST be rejected.',
       {
         persona: ALICE.personaId,
         hubs: ['https://hub.attacker.example/servanda'],
@@ -543,8 +550,10 @@ export function buildAddressingInbox() {
   return {
     ...banner('spec/06-reconciliation-federation.md §6.7, conformance M-17'),
     description:
-      'Inbox records `{ v, type:"inbox", persona, hubs, issued_at, sig }`. Verification rule: ' +
-      'the signature MUST verify against the key named in `persona`. `known_keys` exists only so ' +
+      'Inbox records `{ v, type:"inbox", persona, hubs, dh_key, issued_at, sig }`. Verification ' +
+      'rule: the signature MUST verify against the key named in `persona`. `dh_key` is what §6.3 ' +
+      'seals to, which is why this record is guarded: a forged one does not merely misroute a ' +
+      'persona\'s mail, it hands the forger the key to read it. `known_keys` exists only so ' +
       'a verifier can report WHICH other key signed a rejected record; a verifier without it ' +
       'still rejects, as `invalid-signature`.',
     verification_rule:
@@ -583,12 +592,15 @@ export function buildAddressingOob() {
     signer: ALICE,
   });
 
-  // §6.2: every wire message is { v, type, payload, sender, sent_at, sig }.
+  // §6.2: every wire message is { v, type, payload, sender, recipient, sent_at, sig }.
+  // `recipient` is inside the signed preimage: without it a signature says who wrote the message
+  // and nothing about whom they wrote it to, so any recipient could re-seal it to a third party.
   const unsigned = {
     v: PROTOCOL_VERSION,
     type: 'propose',
     payload: { edge, assertion },
     sender: ALICE.personaId,
+    recipient: BOB.personaId,
     sent_at: proposed_at,
   } as unknown as Record<string, Json>;
   const message = { ...unsigned, sig: signObject(unsigned, ALICE.privateKey) } as unknown as Json;

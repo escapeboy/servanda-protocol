@@ -12,9 +12,9 @@ Assets: vault plaintext, keys/seed, edge integrity, attention (interruption chan
 ## 9.3 Crypto parameters (v0)
 
 - Sign: Ed25519. Hash: SHA-256. Canonicalization: RFC 8785 JCS.
-- KDF: Argon2id (m=64MiB, t=3, p=1 minimum) for passphrase keys.
+- KDF for passphrase keys: **Argon2id with the parameter set (m = 64 MiB, t = 3, p = 1)**. The three move together — they describe one analysed point, not three independent floors. An implementation MAY raise `m` or `t`; it MUST NOT lower any of the three. Every wrapped key MUST record the parameters it was created with, so raising them does not strand an existing vault: a wrap is opened with its own parameters, never with the current defaults. The salt MUST be at least 128 bits, fresh per wrap, from a CSPRNG, and stored beside the wrap.
 - Content encryption: XChaCha20-Poly1305; random 256-bit content key; per-device + passphrase wrapping (M-16).
-- Transport encryption to personas: X25519 (from Ed25519 via birational map) + XChaCha20-Poly1305; HPKE profile targeted for v0.2.
+- Transport encryption to personas: **HPKE (RFC 9180) Base mode**, DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / ChaCha20-Poly1305 (§6.3). The recipient's X25519 key is its own key at `m/7391'/{n}'/1'` and is published in its §6.7 inbox record — the Ed25519 signing key is never converted for key agreement, so one key pair is never used for two algorithms.
 - Derivation: SLIP-0010 hardened paths from BIP-39 seed.
 
 ## 9.4 Trust-gradient safety (informative pointer)
@@ -38,4 +38,4 @@ Autonomy ceilings per risk class and asymmetric collapse are implementation requ
 
 ## 9.6 Out of scope for v0
 
-Threshold group signing; HPKE migration; formal verification of the transition table; anonymous credentials for cross-org level-3 without domain disclosure; post-quantum suites (layered migration path reserved via `v` field).
+Threshold group signing; formal verification of the transition table; anonymous credentials for cross-org level-3 without domain disclosure; post-quantum suites (layered migration path reserved via `v` field).

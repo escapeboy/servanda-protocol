@@ -75,8 +75,9 @@ The edge's current state = the latest valid assertion per the transition table. 
 | open | released | **owed_to alone** | unilateral forgiveness |
 | open | superseded | owner + owed_to (both assert) | successor edge referenced via `supersedes` on the new edge |
 | open | expired | either party after `due` | only if `due` non-null; MUST NOT auto-escalate if edge unverifiable |
-| open | disputed | either party, `evidence_hash` REQUIRED | resolution semantics: v0 defines only exit = mutual supersession or mutual closed |
-| disputed | superseded/closed | both parties | |
+| open | disputed | either party, `evidence_hash` REQUIRED | resolution semantics: §4.4 |
+| disputed | superseded/closed | both parties | agreement |
+| disputed | expired | either party, only once `dispute_window` has elapsed | **not a verdict** — §4.4 |
 
 Any assertion violating this table is **invalid** and MUST be discarded by conforming nodes (this is how constitutional rules bind rude clients).
 
@@ -90,7 +91,13 @@ Any assertion violating this table is **invalid** and MUST be discarded by confo
 - `on-acceptance` (MUST be the default for cross-person edges): owner's evidence assertion opens the acceptance window; owed_to MAY sign `closed` (explicit accept) or `disputed` within the window; window expiry = tacit acceptance — the owner's node MAY then record a final `closed`. The assertion object carries no field in which to cite the expiry, and none is needed: the source state the chain was in already carries the meaning (§4.3).
 - Reflexive commitments have no edges; closure is a vault-local act.
 
-**Dispute resolution in v0: none.** This specification defines no arbitration, no third-party resolver, and no timeout out of `disputed`. A `disputed` edge exits in exactly two ways: both parties assert `closed` (§4.3's last row), or both parties assert `superseded` and a successor edge is proposed (§4.5). There is no other exit. A node MUST NOT move an edge out of `disputed` on any other basis — not on expiry, not on a unilateral assertion, not on an operator or hub decision — and MUST NOT present a `disputed` edge as resolved by the passage of time. An edge can therefore remain `disputed` indefinitely; that is the intended outcome rather than a gap, because the alternative is a protocol-level authority deciding who was right, which v0 deliberately does not have.
+**Dispute resolution in v0: none — and expiry is not resolution.** This specification defines no arbitration and no third-party resolver. A `disputed` edge is *resolved* in exactly two ways: both parties assert `closed`, or both parties assert `superseded` and a successor edge is proposed (§4.5). A node MUST NOT move an edge out of `disputed` on any other basis — not on a unilateral assertion about the merits, not on an operator or hub decision — because the alternative is a protocol-level authority deciding who was right, which v0 deliberately does not have.
+
+A third exit ends the edge without resolving it. Once `dispute_window` has elapsed from the `asserted_at` of the accepted `disputed` assertion, either party MAY assert `expired`. **This decides nothing about the merits.** It does not find for the disputant, it does not find for the owner, and a node MUST NOT present it as a resolution, a fault, or a completion — the edge is over and the question is still open. The `disputed` assertion, its `evidence_hash` and the whole chain remain exactly as they were: expiry appends, it never erases.
+
+Without this exit, both resolutions require BOTH parties, so disputing is a unilateral act that freezes an edge permanently. A counterparty who disputes and then goes silent leaves an owner who may have genuinely fulfilled the commitment holding an edge that can never close, never expire and never be superseded. Ending a dead edge is a different act from ruling on it, and the protocol should not be usable to manufacture a permanent stalemate.
+
+`dispute_window` is a protocol constant of **P30D**, not an edge member: it is nobody's to choose. A per-edge value would let one party pick the window that suits them, and the party who benefits from a long freeze is precisely the party who disputes.
 
 ## 4.5 Supersession (ADR-0010)
 

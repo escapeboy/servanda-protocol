@@ -8,7 +8,7 @@
  * sha256(JCS(object minus its signature field)) and Ed25519 signs that 32-byte digest.
  */
 
-import { ed25519 } from '@noble/curves/ed25519';
+import { ed25519, x25519 } from '@noble/curves/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
 import { sha512 } from '@noble/hashes/sha512';
 import { hmac } from '@noble/hashes/hmac';
@@ -84,6 +84,10 @@ export interface Persona {
   publicKey: Uint8Array;
   /** spec §1.2: persona_id = hex(pubkey) */
   personaId: string;
+  /** §1.2 / §6.3: the X25519 key agreement key at `m/7391'/{i}'/1'`. Never the signing key. */
+  dhPath: string;
+  dhPrivateKey: Uint8Array;
+  dhPublicKey: Uint8Array;
 }
 
 /** spec/01-identity.md §1.2: personas are hardened SLIP-0010 children at m/7391'/{i}'. */
@@ -94,6 +98,10 @@ export function derivePersona(seed: Uint8Array, personaIndex: number): Persona {
   const purpose = slip10DeriveHardened(master, PURPOSE_CONSTANT);
   const child = slip10DeriveHardened(purpose, personaIndex);
   const publicKey = ed25519.getPublicKey(child.key);
+  // §1.2: a hardened child of the persona path. Hardened matters — a non-hardened one could be
+  // walked back toward the seed from the published key, so becoming reachable would link a
+  // persona to its siblings.
+  const dh = slip10DeriveHardened(child, 1);
   return {
     index: personaIndex,
     path: `m/${PURPOSE_CONSTANT}'/${personaIndex}'`,
@@ -101,6 +109,9 @@ export function derivePersona(seed: Uint8Array, personaIndex: number): Persona {
     chainCode: child.chainCode,
     publicKey,
     personaId: toHex(publicKey),
+    dhPath: `m/${PURPOSE_CONSTANT}'/${personaIndex}'/1'`,
+    dhPrivateKey: dh.key,
+    dhPublicKey: x25519.getPublicKey(dh.key),
   };
 }
 

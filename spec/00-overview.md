@@ -91,9 +91,13 @@ Anything that would change a preimage again is now a v0.2 matter.
 These are not spec edits. They are open items that MUST be closed before this specification is
 frozen; a frozen v0.1 that leaves any of them open ships an unreviewed cryptographic assumption.
 
-- **Cryptographic review of the Ed25519 → X25519 birational map (§6.3) and of the Argon2id
-  parameters (§1.7, §9).** Neither has been reviewed by a cryptographer. The map's safety depends
-  on how the same key material is used across two schemes, and the Argon2id parameters are not
-  stated anywhere in this repository as concrete values. This gate cannot be discharged by the
-  editors.
+- **Cryptographic review of the Argon2id parameters (§1.7, §9.3).** Not reviewed by a
+  cryptographer. This gate cannot be discharged by the editors.
+
+  It was two items. The other — the Ed25519 → X25519 birational map — is **gone rather than
+  cleared**: §6.3 now specifies HPKE (RFC 9180) over a persona's own X25519 key, so no key pair
+  is used for two algorithms and there is no map to review. Removing a construction is not the
+  same as having it reviewed, and it is a better outcome: standard primitives used in standard
+  ways, with the RFC's own test vectors as an oracle. The parameters remain, and they are now
+  stated as concrete values (§9.3), which is what makes them reviewable at all.
 - **Trademark clearance of the name "Servanda"** (see the header). Not performed.

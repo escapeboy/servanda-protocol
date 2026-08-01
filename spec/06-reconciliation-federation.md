@@ -10,11 +10,25 @@ Wire messages are transport-agnostic signed JSON. v0 defines two transports:
 
 `propose` (edge + proposed assertion) · `assert` (any subsequent assertion) · `publish`/`unpublish` · `attestation`/`revocation`/`rotation` · `recon_request`/`recon_response` (6.4) · `recover_request`/`recover_response` (6.6)
 
-All messages: `{ v, type, payload, sender:"<persona_id>", sent_at, sig }`.
+All messages: `{ v, type, payload, sender:"<persona_id>", recipient:"<persona_id>", sent_at, sig }`.
+
+**`recipient` is inside the signed preimage, and that is the whole point of it.** Without it a signature says *this persona wrote this* and says nothing about *whom they wrote it to*, so any recipient can re-seal a validly-signed message to a third party and it verifies there unchanged. §6.3's courier is anonymous by design — it authenticates nobody — so the signature is the only place the binding can live.
+
+A recipient MUST discard a message whose `recipient` is not itself, before doing anything else with it. The check is cheap and it is not the only defence: `propose` is separately bound by `edge.owed_to`, and `assert` by party membership. But those are per-message-type rules that each new type must remember to re-derive, and this one holds for every type there will ever be.
+
+`recipient` does not widen what a hub learns. §6.3 seals the entire message, `recipient` included, and the hub already routes by a recipient it can see on the outer envelope.
 
 ## 6.3 Blind courier requirement
 
-Hub-bound payloads MUST be encrypted to the recipient persona key (X25519 ECDH from the Ed25519 keys, XChaCha20-Poly1305). **HPKE is deferred to v1** — a deferral, not a clearance: the v0 construction has not been reviewed by a cryptographer, and the Ed25519 → X25519 birational map it depends on is a gate on the v0.1 freeze (§0). A conforming hub sees: recipient persona_id, ciphertext, timestamps — nothing else. Hubs MUST NOT be able to read or fabricate edges (fabrication is prevented by signature verification at recipients regardless of hub honesty).
+Hub-bound payloads MUST be encrypted to the recipient's X25519 key using **HPKE (RFC 9180) in Base mode**, ciphersuite **DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / ChaCha20-Poly1305** (`kem_id = 0x0020`, `kdf_id = 0x0001`, `aead_id = 0x0003`). A conforming hub sees: recipient persona_id, ciphertext, timestamps — nothing else. Hubs MUST NOT be able to read or fabricate edges (fabrication is prevented by signature verification at recipients regardless of hub honesty).
+
+`info` MUST be `"servanda/0.1 blind-courier v2" || 0x00 || recipient_persona_id`, per §0's domain-separation rule. Binding the `persona_id` and not merely the X25519 key is deliberate: the key is published in a §6.7 inbox record and a persona may publish a new one, so binding the key alone would tie a payload to whichever key an identity currently advertises rather than to the identity. `aad` MUST be the JCS canonical form of the envelope members a courier can read — `{v, type, recipient, sent_at}` — so those stay readable and become unforgeable.
+
+The encapsulated key travels; **no nonce does.** HPKE derives it from the key schedule, so a sender cannot choose, reuse or leak one. One sealed payload per encapsulation: a context MUST NOT be reused across messages.
+
+**Base mode, not Auth.** Binding a sender's static key into the KEM would defeat the property this section exists for — the courier must not learn who sent what. Authentication is the Ed25519 signature inside the ciphertext, and the recipient binding it needs is the `recipient` member of the signed message (§6.2).
+
+*Why an RFC and not a profile of our own.* The previous text specified ECDH followed by an AEAD and left the KDF, the context binding and the nonce derivation unstated — which made the construction implementation-defined, so two conforming nodes could not open each other's payloads. Every one of those decisions is one RFC 9180 has already made and had reviewed, and it ships test vectors, so an implementation can be checked against an answer written by somebody else. That is the part a hand-assembled profile can never have.
 
 ## 6.4 Reconciliation
 
@@ -37,7 +51,7 @@ Periodic pairwise sync between nodes sharing edges:
 
 **Delivery model: asynchronous, store-and-forward, reconciliation-guaranteed.** No protocol operation is real-time; an offline counterparty is the normal case, not an edge case.
 
-- **Inbox designation:** a persona routable over the hub transport publishes a self-signed inbox record `{ v, type:"inbox", persona, hubs:["https://hub.example/servanda"], issued_at, sig }`. Only the persona key may change its own hubs (a hub cannot "move" its users). Org personas MAY inherit hubs from the org domain anchor (§1.5); the inbox record overrides.
+- **Inbox designation:** a persona routable over the hub transport publishes a self-signed inbox record `{ v, type:"inbox", persona, hubs:["https://hub.example/servanda"], dh_key, issued_at, sig }`. `dh_key` is the persona's X25519 public key (§1.2), and a sender MUST NOT seal to a key from a record whose signature does not verify against the persona it names, or whose lifetime has elapsed. M-17 already forbids a hub rewriting this record; carrying the encryption key here is why that matters twice over — a hub able to publish a key it holds could read everything addressed to that persona, which is the same attack as moving their mail, one layer along. A persona reachable only over git needs no `dh_key`, because §6.1 makes git confidentiality repository access and nothing is sealed. Only the persona key may change its own hubs (a hub cannot "move" its users). Org personas MAY inherit hubs from the org domain anchor (§1.5); the inbox record overrides.
 - **Hub priority is the declared order.** `hubs` is an ordered list, most-preferred first. A sender MUST attempt delivery to `hubs[0]` before any later entry and MUST walk the list in order on failure; it MUST NOT reorder the list by its own measurements (latency, past success, operator preference). The order is the persona's own statement about where it wants its mail, and a sender that reorders it silently overrides that choice.
 - **Inbox record lifetime.** An inbox record is valid for 30 days from `issued_at` and MUST be treated as expired thereafter; a sender MUST NOT route to a hub named only by an expired record. The persona SHOULD republish the record at half-life — 15 days after `issued_at` — so a refreshed record is in circulation well before the previous one expires. This is the same 30-day boundary hubs queue undelivered ciphertext for, deliberately: a message cannot outlive the addressing that produced it. Losing either is harmless, because §6.4 reconciliation, not delivery, is the guarantee.
 - **Address form (informative):** clients SHOULD render routable personas as `<petname or handle> @ <hub domain>` with the seal level; the wire identity remains the persona key.
