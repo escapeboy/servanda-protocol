@@ -98,8 +98,9 @@ Every released version tags the repository and pins the vectors that define it.
   conformance from being an argument about interpretation.
 - Consequently, the correct response to "the spec says X but nothing tests X" is a PR adding the
   vector — and that PR is `editorial-with-vectors`, not normative.
-- Use of the protocol name and mark is gated on passing the suite (ADR-0001). The mark question
-  itself is open — see issue #1.
+- Use of the protocol name is gated on passing the suite (ADR-0001). **There is no registered mark
+  and there will not be one** (#1), so the suite is not one defence among three — it is the one
+  that has to hold. A claim of "implements Servanda" is answerable here and nowhere else.
 
 ## Where things that are not spec changes go
 

@@ -88,16 +88,32 @@ Anything that would change a preimage again is now a v0.2 matter.
 
 ## Gates on the v0.1 freeze
 
-These are not spec edits. They are open items that MUST be closed before this specification is
-frozen; a frozen v0.1 that leaves any of them open ships an unreviewed cryptographic assumption.
+These are not spec edits. They were open items that had to be closed before this specification
+could be frozen. **Both are now closed, and they closed in three different ways.** The distinction
+is recorded rather than flattened, because "closed" on its own would let a reader infer a review
+that did not happen.
 
-- **Cryptographic review of the Argon2id parameters (§1.7, §9.3).** Not reviewed by a
-  cryptographer. This gate cannot be discharged by the editors.
+- **The Ed25519 → X25519 birational map is gone rather than cleared.** §6.3 now specifies HPKE
+  (RFC 9180) over a persona's own X25519 key, so no key pair is used for two algorithms and there
+  is no map to review. Removing a construction is not the same as having it reviewed, and here it
+  is the better outcome: standard primitives used in standard ways, with the RFC's own test
+  vectors as an oracle.
 
-  It was two items. The other — the Ed25519 → X25519 birational map — is **gone rather than
-  cleared**: §6.3 now specifies HPKE (RFC 9180) over a persona's own X25519 key, so no key pair
-  is used for two algorithms and there is no map to review. Removing a construction is not the
-  same as having it reviewed, and it is a better outcome: standard primitives used in standard
-  ways, with the RFC's own test vectors as an oracle. The parameters remain, and they are now
-  stated as concrete values (§9.3), which is what makes them reviewable at all.
-- **Trademark clearance of the name "Servanda"** (see the header). Not performed.
+- **The Argon2id parameters (§1.7, §9.3) were accepted by the editors, not reviewed by a
+  cryptographer.** An earlier revision of this section said the gate could not be discharged by
+  the editors. It was discharged by the editors anyway, as a deliberate decision to freeze v0.1
+  rather than wait indefinitely for a reviewer who was never engaged.
+
+  What that decision does and does not buy: the values (m = 64 MiB, t = 3, p = 1) are concrete,
+  they are within the range RFC 9106 §4 describes for the memory-constrained case, and every wrap
+  records the triple it used, so a future revision can raise them without stranding old vaults.
+  What it does not buy is assurance. **No cryptographer has examined this parameter set**, and a
+  frozen v0.1 therefore ships one cryptographic assumption that rests on the editors' judgement.
+  An implementer who needs that assurance should obtain it independently; the gate is closed, not
+  satisfied.
+
+- **Trademark clearance of the name "Servanda" will not be performed.** The maintainer has decided
+  against registering a mark. The name is therefore the project's name in use and nothing more: it
+  is not defended, and no search was run to establish that it is free of anyone else's rights.
+  ADR-0001 named the mark as one of three defences against capture of the protocol's meaning; two
+  remain — the conformance suite as the definition of "implements Servanda", and the licence.

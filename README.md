@@ -5,7 +5,8 @@
 > **Status: DRAFT v0.1-pre — not frozen.**
 > Pre-review. No section is stable. Wire formats, hashes, and the transition table MAY change
 > without a compatibility path until v0.1 is tagged. Do not ship against this yet.
-> The protocol name is a working codename pending a trademark check ([#1](../../issues/1)).
+> The protocol name is settled: "Servanda" is the name, and no trademark will be registered
+> ([#1](../../issues/1)).
 
 An open protocol for **commitments**: typed, evidenced, cryptographically owned records of promises
 between people and organizations, with bilateral signed edges, sovereign local vaults, and optional
@@ -105,6 +106,8 @@ tooling and test vectors (`tools/`, `vectors/`), and the reference implementatio
 [LICENSE-SPEC](LICENSE-SPEC) is retained only as a pointer — the earlier CC-BY-4.0 grant on the
 prose is superseded.
 
-The protocol name and mark are reserved (ADR-0001). **Trademark clearance has not been performed**
-([#1](../../issues/1)) — the name "Servanda" is provisional and this blocks going public. Passing
-the conformance suite is the intended gate for using the mark once it is cleared.
+**No trademark will be registered** ([#1](../../issues/1)). ADR-0001 reserved the name and mark as
+one of three defences against capture of the protocol's meaning; that one is now deliberately not
+taken. Two remain, and they carry the weight: passing the conformance suite is what "implements
+Servanda" means (§8), and the licence governs the text. No clearance search was run, so the name
+is used without any claim that it is free of anyone else's rights.
