@@ -24,6 +24,8 @@ const SCHEMA_DIR = join(VECTORS_ROOT, 'schema');
 const MAPPING: { vector: string; schema: string }[] = [
   { vector: 'canonicalization/jcs.json', schema: 'canonicalization.schema.json' },
   { vector: 'hashing/commitment-hash.json', schema: 'hashing.schema.json' },
+  { vector: 'envelope/envelope-id.json', schema: 'envelope-id.schema.json' },
+  { vector: 'envelope/bounds.json', schema: 'envelope-bounds.schema.json' },
   { vector: 'signatures/signatures.json', schema: 'signatures.schema.json' },
   { vector: 'derivation/persona-keys.json', schema: 'derivation.schema.json' },
   { vector: 'transitions/valid.json', schema: 'transitions.schema.json' },

@@ -578,6 +578,130 @@ console.log('9. Node-surface vectors replayed (§7; M-20, M-14)');
 }
 
 // ---------------------------------------------------------------------------
+console.log('10. §2 envelope vectors (M-19, the id preimage)');
+// ---------------------------------------------------------------------------
+{
+  const v = readVector('envelope/envelope-id.json');
+  check(v.domain_tag.tag === DOMAIN_TAG.envelope_id, 'envelope: domain tag is the one §0 fixes');
+  check(v.domain_tag.separator === '0x00', 'envelope: separator is a single 0x00 octet');
+
+  for (const c of v.cases) {
+    // Recomputed from the envelope, never copied from the file.
+    check(canonicalize(c.envelope_sans_id as Json) === c.canonical, `envelope/${c.name}: canonical form`);
+    const tagged = domainSeparated(v.domain_tag.tag, new TextEncoder().encode(c.canonical));
+    check(toHex(tagged) === c.id_preimage_hex, `envelope/${c.name}: domain-tagged preimage octets`);
+    check(sha256Hex(tagged) === c.id, `envelope/${c.name}: id value`);
+
+    // The tag has to be load-bearing here too.
+    check(
+      digestHex(c.envelope_sans_id as Json) !== c.id,
+      `envelope/${c.name}: untagged digest differs (domain separation is real)`,
+    );
+
+    const equalsBase = c.id === v.base_id;
+    check(equalsBase === c.same_id_as_base, `envelope/${c.name}: same_id_as_base=${c.same_id_as_base}`);
+
+    // `clipped` is true or absent. `false` would change the id of every unclipped envelope.
+    check(
+      !('clipped' in c.envelope_sans_id) || c.envelope_sans_id.clipped === true,
+      `envelope/${c.name}: clipped is true or absent, never false`,
+    );
+  }
+
+  // The headline property of "sans id": stripping a present `id` reproduces the base.
+  const { id: _drop, ...stripped } = v.id_removal.envelope_with_id;
+  const recomputed = sha256Hex(
+    domainSeparated(v.domain_tag.tag, new TextEncoder().encode(canonicalize(stripped as Json))),
+  );
+  check(recomputed === v.base_id, 'envelope: removing `id` reproduces the base id');
+  check(recomputed === v.id_removal.id_after_removal, 'envelope: recorded id_after_removal is right');
+  check(
+    v.id_removal.envelope_with_id.id !== v.base_id,
+    'envelope: the discarded `id` was NOT already the answer (the case proves something)',
+  );
+
+  // `persona` and `received_at` reach the digest. §2's determinism sentence names neither, so
+  // these two cases are what make the gap checkable rather than a matter of reading.
+  for (const name of ['differs-in-persona', 'differs-in-received-at']) {
+    const c = v.cases.find((x: any) => x.name === name);
+    check(!!c && c.id !== v.base_id, `envelope: ${name} yields a DIFFERENT id`);
+  }
+  console.log(`   ${v.cases.length} envelope-id cases replayed`);
+}
+
+{
+  const v = readVector('envelope/bounds.json');
+  const B = v.bounds;
+  const enc = new TextEncoder();
+  const octets = (s: string) => enc.encode(s).length;
+
+  // Every bound in the table must be exercised by at least one case on each side of it, or the
+  // family reports coverage it does not have.
+  const exercised = new Map<string, Set<boolean>>();
+  for (const c of v.cases) {
+    if (!exercised.has(c.bound)) exercised.set(c.bound, new Set());
+    exercised.get(c.bound)!.add(c.within_bounds);
+  }
+  for (const bound of Object.keys(B)) {
+    if (bound === 'canonicalizer_refusal_depth') continue; // a canonicalizer property, stated not cased
+    const sides = exercised.get(bound);
+    check(!!sides && sides.has(true) && sides.has(false), `bounds: ${bound} has a case on both sides`);
+  }
+
+  for (const c of v.cases) {
+    const e = c.envelope_sans_id;
+    let measured: number;
+    switch (c.bound) {
+      case 'refs_entries':
+        measured = e.refs.length;
+        break;
+      case 'ref_value_octets':
+        measured = Math.max(...e.refs.map((r: any) => octets(r.value)));
+        break;
+      case 'actor_label_octets':
+        measured = octets(e.actor.label);
+        break;
+      case 'payload_string_octets':
+        measured = Math.max(
+          ...Object.values(e.payload).filter((x): x is string => typeof x === 'string').map(octets),
+        );
+        break;
+      case 'payload_depth_below_payload': {
+        const depth = (x: unknown): number =>
+          x !== null && typeof x === 'object'
+            ? 1 + Math.max(0, ...Object.values(x as Record<string, unknown>).map(depth))
+            : 0;
+        measured = Math.max(0, ...Object.values(e.payload).map(depth));
+        break;
+      }
+      case 'canonical_form_octets':
+        measured = octets(canonicalize(e as Json));
+        break;
+      default:
+        throw new Error(`unhandled bound ${c.bound}`);
+    }
+    // Measured independently of what the generator wrote down.
+    check(measured === c.measured, `bounds/${c.name}: measured ${c.bound}`, `recomputed ${measured}`);
+    check(
+      (measured <= B[c.bound]) === c.within_bounds,
+      `bounds/${c.name}: within_bounds=${c.within_bounds}`,
+    );
+  }
+
+  // The clipping example must actually land on a scalar boundary and must actually be a prefix.
+  const ex = v.clipping.scalar_boundary_example;
+  check(octets(ex.source) === ex.source_octets, 'bounds: clipping example source length');
+  check(octets(ex.clipped) === ex.clipped_to_octets, 'bounds: clipping example clipped length');
+  check(ex.source.startsWith(ex.clipped), 'bounds: the clipped value is a prefix of the source');
+  check(
+    [...ex.clipped].every((ch) => ex.source.includes(ch)),
+    'bounds: the clipped value contains no code point absent from the source',
+  );
+  check(ex.clipped_to_octets <= B.payload_string_octets, 'bounds: clipping lands inside the bound');
+  console.log(`   ${v.cases.length} bound cases replayed`);
+}
+
+// ---------------------------------------------------------------------------
 console.log();
 if (failures > 0) {
   console.error(`SELFCHECK FAILED — ${failures} of ${checks} checks failed.`);

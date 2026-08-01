@@ -49,6 +49,7 @@ import {
   verifyObject,
   PURPOSE_CONSTANT,
 } from './crypto.js';
+import { buildEnvelopeId, buildEnvelopeBounds } from './envelope.js';
 import { CANONICALIZATION_CASES } from './cases-canonicalization.js';
 import {
   INVALID_CASES,
@@ -86,6 +87,24 @@ function banner(spec: string) {
 /** Stable 2-space JSON with a trailing newline, so git diffs stay readable. */
 export function serialize(value: unknown): string {
   return JSON.stringify(value, null, 2) + '\n';
+}
+
+/**
+ * §2 envelope families. The bodies live in ./envelope.ts; these wrappers exist only to attach the
+ * same banner every other family carries.
+ */
+export function buildEnvelopeIdFamily() {
+  return {
+    ...banner('spec/02-signal-envelope.md §2, spec/00-overview.md (domain separation)'),
+    ...buildEnvelopeId(),
+  };
+}
+
+export function buildEnvelopeBoundsFamily() {
+  return {
+    ...banner('spec/02-signal-envelope.md §2 (bounds), spec/08-conformance.md M-19'),
+    ...buildEnvelopeBounds(),
+  };
 }
 
 export function buildCanonicalization() {
@@ -876,6 +895,8 @@ export function buildAll(): GeneratedFile[] {
   return [
     { path: 'canonicalization/jcs.json', content: serialize(buildCanonicalization()) },
     { path: 'hashing/commitment-hash.json', content: serialize(buildHashing()) },
+    { path: 'envelope/envelope-id.json', content: serialize(buildEnvelopeIdFamily()) },
+    { path: 'envelope/bounds.json', content: serialize(buildEnvelopeBoundsFamily()) },
     { path: 'signatures/signatures.json', content: serialize(buildSignatures()) },
     { path: 'derivation/persona-keys.json', content: serialize(buildDerivation()) },
     { path: 'transitions/valid.json', content: serialize(buildTransitionsValid()) },
