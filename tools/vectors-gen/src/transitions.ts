@@ -26,6 +26,7 @@ export type RejectionReason =
   | 'due-is-null'
   | 'expiry-before-due'
   | 'acceptance-window-not-elapsed'
+  | 'dispute-window-not-elapsed'
   | 'implicit-transition-not-assertable'
   | 'duplicate-assertion-by-same-party'
   | 'malformed-edge-acceptance-window';
@@ -71,7 +72,17 @@ interface MutableState {
   supersededBy: Set<string>;
   /** Parties that have asserted `closed` out of `disputed` (§4.3 requires both). */
   disputedClosedBy: Set<string>;
+  /** asserted_at of the accepted `disputed` assertion — when `dispute_window` starts running. */
+  disputedAt: string | null;
 }
+
+/**
+ * §4.4: `dispute_window` is a protocol CONSTANT, not an edge member.
+ *
+ * A per-edge value would let one party choose the window that suits them, and the party who
+ * benefits from a long freeze is precisely the party who disputes.
+ */
+export const DISPUTE_WINDOW = 'P30D';
 
 /** Minimal ISO-8601 duration support: the P5D / PnD / PTnH forms the spec uses. */
 export function addDuration(isoTimestamp: string, duration: string): number {
@@ -90,6 +101,7 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
     acceptanceWindowOpenedAt: null,
     supersededBy: new Set(),
     disputedClosedBy: new Set(),
+    disputedAt: null,
   };
 
   const outcomes: AssertionOutcome[] = [];
@@ -167,6 +179,17 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
       return null;
 
     case 'expired':
+      // §4.4: a third exit that ends a `disputed` edge WITHOUT resolving it. Both resolutions
+      // require both parties, so without this a unilateral dispute freezes an edge permanently.
+      // It decides nothing about the merits — see the rejection names, which say `window`, never
+      // anything about who was right.
+      if (st.state === 'disputed') {
+        if (st.disputedAt === null) return 'illegal-source-state';
+        if (Date.parse(a.asserted_at) < addDuration(st.disputedAt, DISPUTE_WINDOW)) {
+          return 'dispute-window-not-elapsed';
+        }
+        return null;
+      }
       if (st.state !== 'open' && st.state !== 'pending-acceptance') {
         return 'illegal-source-state';
       }
@@ -265,6 +288,7 @@ function apply(edge: Edge, a: Assertion, st: MutableState): void {
 
     case 'disputed':
       st.state = 'disputed';
+      st.disputedAt = a.asserted_at;
       st.acceptanceWindowOpenedAt = null;
       return;
 

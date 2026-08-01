@@ -28,6 +28,9 @@ export const T_EVIDENCE = '2026-08-02T12:00:00Z';
 export const T_ACCEPT = '2026-08-03T12:00:00Z';
 /** T_EVIDENCE + P5D = 2026-08-07T12:00:00Z, so this is past the window. */
 export const T_AFTER_WINDOW = '2026-08-08T12:00:00Z';
+/** The dispute is at T_ACCEPT; §4.4's `dispute_window` is P30D, so these bracket its end. */
+export const T_DISPUTE_WINDOW_OPEN = '2026-09-01T12:00:00Z';
+export const T_AFTER_DISPUTE_WINDOW = '2026-09-02T12:00:01Z';
 
 const baseCommitment: Commitment = {
   v: 'servanda/0.1',
@@ -210,6 +213,41 @@ export const VALID_CASES: TransitionCase[] = [
       }),
     ],
     expected: [null, null, null],
+    expectedFinalState: 'expired',
+  },
+  {
+    name: 'disputed-then-expired-after-the-window',
+    description:
+      '§4.4: a dispute that goes silent does not freeze the edge forever. Once `dispute_window` ' +
+      '(P30D) has run from the disputing assertion, EITHER party may assert `expired`. This ' +
+      'resolves nothing — the dispute and its evidence stay in the chain — it ends a dead edge.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'disputed',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+        evidence_hash: evidenceHash('invoice PDFs missing the VAT line'),
+      }),
+      // The OWNER expires it — the party the frozen edge was held against.
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'expired',
+        asserted_at: T_AFTER_DISPUTE_WINDOW,
+        signer: ALICE,
+      }),
+    ],
+    expected: [null, null, null, null, null],
     expectedFinalState: 'expired',
   },
   {
@@ -435,6 +473,73 @@ export const INVALID_CASES: TransitionCase[] = [
     ],
     expected: [null, null, 'expiry-before-due'],
     expectedFinalState: 'open',
+  },
+  {
+    name: 'dispute-expiry-before-the-window-elapsed',
+    description:
+      '§4.4: the dispute window is what stops `expired` becoming a way to walk away from a ' +
+      'dispute the moment it is raised. Expiring early would hand the disputed party a ' +
+      'unilateral exit — the mirror of the freeze the window exists to prevent.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'disputed',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+        evidence_hash: evidenceHash('invoice PDFs missing the VAT line'),
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'expired',
+        asserted_at: T_DISPUTE_WINDOW_OPEN,
+        signer: ALICE,
+      }),
+    ],
+    expected: [null, null, null, null, 'dispute-window-not-elapsed'],
+    expectedFinalState: 'disputed',
+  },
+  {
+    name: 'dispute-expiry-by-a-non-party',
+    description:
+      '§4.4 says EITHER PARTY, and a stranger is neither. The window makes the timing public, ' +
+      'so without this an onlooker could end an edge simply by waiting for it.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'disputed',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+        evidence_hash: evidenceHash('invoice PDFs missing the VAT line'),
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'expired',
+        asserted_at: T_AFTER_DISPUTE_WINDOW,
+        signer: CAROL,
+      }),
+    ],
+    expected: [null, null, null, null, 'signer-not-a-party'],
+    expectedFinalState: 'disputed',
   },
   {
     name: 'disputed-without-evidence',

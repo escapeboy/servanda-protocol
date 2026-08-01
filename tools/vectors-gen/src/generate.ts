@@ -583,12 +583,15 @@ export function buildAddressingOob() {
     signer: ALICE,
   });
 
-  // §6.2: every wire message is { v, type, payload, sender, sent_at, sig }.
+  // §6.2: every wire message is { v, type, payload, sender, recipient, sent_at, sig }.
+  // `recipient` is inside the signed preimage: without it a signature says who wrote the message
+  // and nothing about whom they wrote it to, so any recipient could re-seal it to a third party.
   const unsigned = {
     v: PROTOCOL_VERSION,
     type: 'propose',
     payload: { edge, assertion },
     sender: ALICE.personaId,
+    recipient: BOB.personaId,
     sent_at: proposed_at,
   } as unknown as Record<string, Json>;
   const message = { ...unsigned, sig: signObject(unsigned, ALICE.privateKey) } as unknown as Json;

@@ -10,7 +10,13 @@ Wire messages are transport-agnostic signed JSON. v0 defines two transports:
 
 `propose` (edge + proposed assertion) · `assert` (any subsequent assertion) · `publish`/`unpublish` · `attestation`/`revocation`/`rotation` · `recon_request`/`recon_response` (6.4) · `recover_request`/`recover_response` (6.6)
 
-All messages: `{ v, type, payload, sender:"<persona_id>", sent_at, sig }`.
+All messages: `{ v, type, payload, sender:"<persona_id>", recipient:"<persona_id>", sent_at, sig }`.
+
+**`recipient` is inside the signed preimage, and that is the whole point of it.** Without it a signature says *this persona wrote this* and says nothing about *whom they wrote it to*, so any recipient can re-seal a validly-signed message to a third party and it verifies there unchanged. §6.3's courier is anonymous by design — it authenticates nobody — so the signature is the only place the binding can live.
+
+A recipient MUST discard a message whose `recipient` is not itself, before doing anything else with it. The check is cheap and it is not the only defence: `propose` is separately bound by `edge.owed_to`, and `assert` by party membership. But those are per-message-type rules that each new type must remember to re-derive, and this one holds for every type there will ever be.
+
+`recipient` does not widen what a hub learns. §6.3 seals the entire message, `recipient` included, and the hub already routes by a recipient it can see on the outer envelope.
 
 ## 6.3 Blind courier requirement
 
