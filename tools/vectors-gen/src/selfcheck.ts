@@ -31,6 +31,7 @@ import {
   fromHex,
 } from './crypto.js';
 import { verifyChain } from './transitions.js';
+import { evaluateRequest } from './recovery.js';
 import { DOMAIN_TAG, domainSeparated, edgeId } from './protocol.js';
 import {
   ACT_TOOL,
@@ -714,6 +715,28 @@ console.log('10. §2 envelope vectors (M-19, the id preimage)');
   );
   check(ex.clipped_to_octets <= B.payload_string_octets, 'bounds: clipping lands inside the bound');
   console.log(`   ${v.cases.length} bound cases replayed`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('11. §6.6 recovery proof-of-possession (#37)');
+// ---------------------------------------------------------------------------
+{
+  const v = readVector('recovery/proof-of-possession.json');
+  for (const c of v.cases) {
+    // Re-judged from the request, never copied from the file.
+    const outcome = evaluateRequest(c.request);
+    check(outcome.accepted === c.expected.accepted, `recovery/${c.name}: accepted`);
+    check((outcome.reason ?? null) === (c.expected.reason ?? null), `recovery/${c.name}: reason`);
+  }
+  // The hole this family exists for, asserted by name rather than by count.
+  const bare = v.cases.find((c: any) => c.name === 'bare-rotation-is-not-a-proof');
+  check(!!bare, 'recovery: the bare-rotation case is present');
+  check(
+    !!bare && bare.request.proof.rotation !== undefined && bare.request.proof.sig === undefined,
+    'recovery: the bare-rotation case really carries a rotation and really carries no signature',
+  );
+  check(!!bare && !bare.expected.accepted, 'recovery: a bare rotation is REFUSED');
+  console.log(`   ${v.cases.length} recovery cases replayed`);
 }
 
 // ---------------------------------------------------------------------------

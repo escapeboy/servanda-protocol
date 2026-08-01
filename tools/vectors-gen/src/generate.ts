@@ -50,6 +50,7 @@ import {
   PURPOSE_CONSTANT,
 } from './crypto.js';
 import { buildEnvelopeId, buildEnvelopeBounds } from './envelope.js';
+import { buildRecovery } from './recovery.js';
 import { CANONICALIZATION_CASES } from './cases-canonicalization.js';
 import {
   INVALID_CASES,
@@ -104,6 +105,14 @@ export function buildEnvelopeBoundsFamily() {
   return {
     ...banner('spec/02-signal-envelope.md §2 (bounds), spec/08-conformance.md M-19'),
     ...buildEnvelopeBounds(),
+  };
+}
+
+/** §6.6 recovery. Body in ./recovery.ts; this wrapper only attaches the banner. */
+export function buildRecoveryFamily() {
+  return {
+    ...banner('spec/06-reconciliation-federation.md §6.6 (proof of possession)'),
+    ...buildRecovery(),
   };
 }
 
@@ -915,6 +924,7 @@ export function buildAll(): GeneratedFile[] {
     { path: 'transitions/invalid.json', content: serialize(buildTransitionsInvalid()) },
     { path: 'addressing/inbox-records.json', content: serialize(buildAddressingInbox()) },
     { path: 'addressing/oob-bootstrap.json', content: serialize(buildAddressingOob()) },
+    { path: 'recovery/proof-of-possession.json', content: serialize(buildRecoveryFamily()) },
     { path: 'node-surface/actions.json', content: serialize(buildNodeSurfaceActions()) },
     { path: 'node-surface/brief-slots.json', content: serialize(buildNodeSurfaceBriefSlots()) },
     { path: 'node-surface/act-tool.json', content: serialize(buildNodeSurfaceActTool()) },

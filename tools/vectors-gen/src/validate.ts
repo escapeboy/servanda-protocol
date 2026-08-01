@@ -32,6 +32,7 @@ const MAPPING: { vector: string; schema: string }[] = [
   { vector: 'transitions/invalid.json', schema: 'transitions.schema.json' },
   { vector: 'addressing/inbox-records.json', schema: 'addressing-inbox.schema.json' },
   { vector: 'addressing/oob-bootstrap.json', schema: 'addressing-oob.schema.json' },
+  { vector: 'recovery/proof-of-possession.json', schema: 'recovery.schema.json' },
   { vector: 'node-surface/actions.json', schema: 'node-surface-actions.schema.json' },
   { vector: 'node-surface/act-tool.json', schema: 'node-surface-act.schema.json' },
   { vector: 'node-surface/brief-slots.json', schema: 'node-surface-brief.schema.json' },
