@@ -9,6 +9,7 @@
 ## 1.2 Persona derivation
 
 - Personas are hardened SLIP-0010 child keys: path `m/7391'/{persona_index}'` (7391 = registered purpose constant for this protocol; placeholder until IANA-style registry exists).
+- Each persona additionally has an **X25519 key agreement key** at `m/7391'/{persona_index}'/1'`, used only by §6.3 and published in the persona's §6.7 inbox record. Hardened, like its parent: a non-hardened child could be walked back toward the seed from a published key, so the act of becoming reachable would link a persona to its siblings and defeat §1.2's unlinkability. The signing key is NEVER converted for key agreement — one key pair, one algorithm. `persona_id` remains the Ed25519 public key; the X25519 key is not an identity and MUST NOT be used as one.
 - Derivation MUST be deterministic from the seed (recovery, ADR-0014) and MUST be one-way (unlinkability: no observer without the seed can link two personas).
 - `persona_index` assignment is local bookkeeping; the vault records `{persona_index → context_label}`.
 - A persona is identified on the wire by its public key: `persona_id = hex(pubkey)`.

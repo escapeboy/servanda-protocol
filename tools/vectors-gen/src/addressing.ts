@@ -32,6 +32,8 @@ export interface InboxRecord {
   type: 'inbox';
   persona: string;
   hubs: string[];
+  /** §6.7 / §6.3: the persona's X25519 key. What a sender seals to, and why M-17 guards this record. */
+  dh_key: string;
   issued_at: string;
   sig: string;
 }
@@ -58,6 +60,7 @@ export function makeInboxRecord(opts: {
   v: string;
   persona: string;
   hubs: string[];
+  dh_key: string;
   issued_at: string;
   signer: Persona;
   /** Flips one nibble of the signature — for the malformed-signature vector. */
@@ -68,6 +71,7 @@ export function makeInboxRecord(opts: {
     type: 'inbox' as const,
     persona: opts.persona,
     hubs: opts.hubs,
+    dh_key: opts.dh_key,
     issued_at: opts.issued_at,
   };
   let sig = signObject(unsigned as unknown as Record<string, Json>, opts.signer.privateKey);
