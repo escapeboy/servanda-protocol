@@ -1,12 +1,14 @@
 # Servanda Protocol — Specification v0 (draft)
 
 **Status:** DRAFT v0.1-pre · 2026-07-27 · not frozen, pre-review
-**Name:** Servanda — from *pacta sunt servanda* ("agreements must be kept"). The name is
-provisional: it is descriptive Latin in the public domain, but **no trademark clearance has been
-performed**, and clearance is a blocker on publishing this specification.
+**Name:** Servanda — from *pacta sunt servanda* ("agreements must be kept"). The name is settled
+and **no trademark will be registered** (#1). It is descriptive Latin in the public domain; no
+clearance search was run, so it is used without any claim that it is free of others' rights. The
+conformance suite in §8, not a mark, is what "implements Servanda" answers to.
 **Editors:** N. Katsarov
-**License:** Apache-2.0, for this specification and for the reference implementation (protocol name
-mark reserved, ADR-0001; see [LICENSE](../LICENSE))
+**License:** Apache-2.0, for this specification and for the reference implementation (see
+[LICENSE](../LICENSE)). ADR-0001 reserved the protocol name; with no mark registered, §8's suite is
+what that reservation now rests on.
 
 ## Abstract
 
