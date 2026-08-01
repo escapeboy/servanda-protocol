@@ -45,7 +45,7 @@ An organization has its own root key pair (generated per §1.1 or HSM-held; cust
 ```json
 { "v": "servanda/0.2", "org_root": "<pubkey_hex>", "hubs": ["https://hub.example/servanda"] }
 ```
-  and/or a DNS TXT record `_servanda.{domain}` = `v=servanda0.1; k=<pubkey_hex>`.
+  and/or a DNS TXT record `_servanda.{domain}` = `v=servanda0.1; k=<pubkey_hex>`. **That `v` keeps its `0.1` spelling in v0.2, deliberately.** It versions this record's own format, which is unchanged, and it is published in DNS by every anchored organization — bumping it would invalidate every anchor in existence and require them all to republish, in exchange for no difference in what the record means. It moves when the record does.
 - Verifiers MUST check the anchor at signature-verification time and SHOULD cache with the resource's TTL.
 
 ## 1.6 Binding proof ladder & persona linking
