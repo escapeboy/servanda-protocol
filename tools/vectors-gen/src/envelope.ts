@@ -397,7 +397,23 @@ export function buildEnvelopeBounds() {
 
   // The canonical-form bound is measured, not asserted: it is the one bound that depends on every
   // other member at once, so a case built to sit just inside it has to be weighed.
-  const filler = (n: number) => ({ ...BASE, payload: { body: asciiOf(n) } });
+  //
+  // It must also not breach any OTHER bound on its way there — a case that sits on the
+  // canonical-form limit by carrying one 65k payload string is not a canonical-form case, it is a
+  // payload-string case wearing the wrong name, and an implementation would reject it for the
+  // wrong reason. The filler is therefore spread across members that each stay inside
+  // `payload_string_octets`, with the last one sized to land on the limit.
+  const filler = (n: number) => {
+    const payload: Record<string, Json> = {};
+    let remaining = n;
+    let i = 0;
+    while (remaining > B.payload_string_octets) {
+      payload[`part_${i++}`] = asciiOf(B.payload_string_octets);
+      remaining -= B.payload_string_octets;
+    }
+    payload[`part_${i}`] = asciiOf(remaining);
+    return { ...BASE, payload };
+  };
   let lo = 0;
   let hi = B.canonical_form_octets;
   while (lo < hi) {

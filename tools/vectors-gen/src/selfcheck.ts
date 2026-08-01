@@ -648,44 +648,48 @@ console.log('10. §2 envelope vectors (M-19, the id preimage)');
     check(!!sides && sides.has(true) && sides.has(false), `bounds: ${bound} has a case on both sides`);
   }
 
+  const depthOf = (x: unknown): number =>
+    x !== null && typeof x === 'object'
+      ? 1 + Math.max(0, ...Object.values(x as Record<string, unknown>).map(depthOf))
+      : 0;
+
+  /** Every bound measured at once, so a case can be checked against all of them, not just its own. */
+  const measureAll = (e: any): Record<string, number> => ({
+    refs_entries: e.refs.length,
+    ref_value_octets: Math.max(0, ...e.refs.map((r: any) => octets(r.value))),
+    actor_label_octets: octets(e.actor.label),
+    payload_string_octets: Math.max(
+      0,
+      ...Object.values(e.payload).filter((x): x is string => typeof x === 'string').map(octets),
+    ),
+    payload_depth_below_payload: Math.max(0, ...Object.values(e.payload).map(depthOf)),
+    canonical_form_octets: octets(canonicalize(e as Json)),
+  });
+
   for (const c of v.cases) {
-    const e = c.envelope_sans_id;
-    let measured: number;
-    switch (c.bound) {
-      case 'refs_entries':
-        measured = e.refs.length;
-        break;
-      case 'ref_value_octets':
-        measured = Math.max(...e.refs.map((r: any) => octets(r.value)));
-        break;
-      case 'actor_label_octets':
-        measured = octets(e.actor.label);
-        break;
-      case 'payload_string_octets':
-        measured = Math.max(
-          ...Object.values(e.payload).filter((x): x is string => typeof x === 'string').map(octets),
-        );
-        break;
-      case 'payload_depth_below_payload': {
-        const depth = (x: unknown): number =>
-          x !== null && typeof x === 'object'
-            ? 1 + Math.max(0, ...Object.values(x as Record<string, unknown>).map(depth))
-            : 0;
-        measured = Math.max(0, ...Object.values(e.payload).map(depth));
-        break;
-      }
-      case 'canonical_form_octets':
-        measured = octets(canonicalize(e as Json));
-        break;
-      default:
-        throw new Error(`unhandled bound ${c.bound}`);
-    }
+    const all = measureAll(c.envelope_sans_id);
+    const measured = all[c.bound]!;
+
     // Measured independently of what the generator wrote down.
     check(measured === c.measured, `bounds/${c.name}: measured ${c.bound}`, `recomputed ${measured}`);
     check(
       (measured <= B[c.bound]) === c.within_bounds,
       `bounds/${c.name}: within_bounds=${c.within_bounds}`,
     );
+
+    // A case must breach ONLY the bound it names. The first draft of the canonical-form cases
+    // reached 65536 octets by carrying a single 65k payload string, which breaches
+    // payload_string_octets eight times over — an implementation would have rejected it for a
+    // reason that had nothing to do with the bound the case claims to be about, and the case
+    // would still have "passed".
+    for (const [bound, value] of Object.entries(all)) {
+      if (bound === c.bound) continue;
+      check(
+        value <= B[bound]!,
+        `bounds/${c.name}: does not incidentally breach ${bound}`,
+        `${bound}=${value} exceeds ${B[bound]}`,
+      );
+    }
   }
 
   // The clipping example must actually land on a scalar boundary and must actually be a prefix.
