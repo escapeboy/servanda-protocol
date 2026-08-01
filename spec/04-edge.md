@@ -4,7 +4,7 @@
 
 ```json
 {
-  "v": "servanda/0.1",
+  "v": "servanda/0.2",
   "type": "edge",
   "edge_id": "<sha256 of the domain-tagged preimage — see below>",
   "commitment_hash": "<hex>",
@@ -56,7 +56,7 @@ edge_id = 141ffc0642fe610224ede93212bc2526d577a2d8ec2a29024afadba0ca5ffe0a
 
 Every transition is a signed assertion:
 ```json
-{ "v":"servanda/0.1", "type":"assertion", "edge_id":"...", "state":"<target>",
+{ "v":"servanda/0.2", "type":"assertion", "edge_id":"...", "state":"<target>",
   "asserted_at":"RFC3339", "by":"<pubkey>", "evidence_hash":"<hex>|null", "sig":"..." }
 ```
 The edge's current state = the latest valid assertion per the transition table. Nodes MUST retain the full assertion chain (append-only).
@@ -84,6 +84,12 @@ Any assertion violating this table is **invalid** and MUST be discarded by confo
 **`open` is never assertable.** The `confirmed → open` transition is implicit: a node performs it on accepting a `confirmed` assertion, and no assertion carries `open` in its `state` member. Because no row of this table authorizes any signer to produce one, an assertion whose `state` is `open` violates the table and MUST be discarded under M-14. A node SHOULD report the reason as `implicit-transition-not-assertable` rather than as a malformed object, so that a rude client learns which rule it broke. `confirmed` and `open` are one effective state for every other row of this table: wherever `open` appears as a source state, an edge whose latest valid assertion is `confirmed` satisfies it.
 
 **`pending-acceptance` is a state a node computes**; it is never a value carried in an assertion's `state` member. An `on-acceptance` edge enters it when the owner's evidence assertion is accepted, and the node MUST record the `asserted_at` of that assertion as the instant from which `acceptance_window` runs. A `closed` assertion by the owner from `pending-acceptance` MUST be discarded unless `asserted_at` is greater than or equal to that instant plus `acceptance_window`. Once a `disputed` assertion is accepted the acceptance window is cancelled; the edge MUST NOT re-enter `pending-acceptance`, and the only exits are those the `disputed` rows provide. A node MUST NOT infer act 1 from act 3 or vice versa by inspecting the assertion alone: which act a `closed` assertion by the owner performs is determined by the state the chain was in when it arrived.
+
+**`asserted_at` MUST be non-decreasing per signer within a chain.** A node MUST discard an assertion whose `asserted_at` is earlier than the `asserted_at` of the most recent accepted assertion by that same signer.
+
+The reason is that both windows in this specification — `acceptance_window` here and `dispute_window` in §4.4 — are measured between two `asserted_at` values, and until v0.2 both of those values could be written by the party the window constrains. An owner could mint `closed` dated years in the past and `closed` dated now, one second apart, and a node would compute the window as elapsed on an edge the counterparty had only ever confirmed. The contrast that identifies the flaw is `expired` from a due date: `due` sits on the edge object that both parties signed, cannot be moved unilaterally, and so the check on it means something.
+
+**What this rule buys, and what it does not.** It closes the observed attack, which needs two assertions by one signer with the later one backdated. It does NOT stop a party backdating its *first* assertion in a chain, because there is nothing earlier by that signer to compare against and this protocol has no trusted clock. **A window between two self-asserted instants is therefore evidence about a cooperating counterparty and MUST NOT be relied on against a hostile one.** A node MAY additionally refuse an assertion dated in its own future; that is local policy, not conformance, because two honest nodes disagree about *now* and the protocol has no way to say which is right.
 
 ## 4.4 Closure
 

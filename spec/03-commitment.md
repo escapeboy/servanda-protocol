@@ -4,7 +4,7 @@
 
 ```json
 {
-  "v": "servanda/0.1",
+  "v": "servanda/0.2",
   "type": "commitment",
   "intent": "string, human-readable, ≤ 500 chars",
   "owner": "<persona_id | group_pubkey>",
@@ -39,7 +39,7 @@ commitment_hash = sha256( "servanda/0.1:commitment_hash" || 0x00
 
 ```json
 {
-  "v": "servanda/0.1",
+  "v": "servanda/0.2",
   "type": "expectation",
   "expect": "string",
   "from": "<external_label | persona_id>",

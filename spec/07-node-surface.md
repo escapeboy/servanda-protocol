@@ -37,6 +37,12 @@ Serves both inbound proposals and the local extraction-confirmation queue. Every
 ```
 `act` signs one assertion against one edge, as the calling persona, and is the only tool that does. The node MUST verify the resulting assertion against the §4.3 transition table before recording it and MUST reject the call rather than record an invalid assertion (M-14). `done` requires the caller to be the edge's `owner` and `evidence_hash` to be non-null; `release` requires the caller to be `owed_to` and `evidence_hash` to be null (§4.3). A node MUST NOT accept an `act` call from a persona that is not a party to the edge (M-3).
 
+**A refusal MUST name its reason from the §4.3 vocabulary, not a narrower one.** v0.1 fixed seven `rejection_reason` values while the transition table produced fifteen, so eight distinct refusals — "the edge is over", "you already signed this one", "the edge object is malformed" — reached the caller as the single word `illegal-source-state`. A node MUST report `terminal-state-reached`, `duplicate-assertion-by-same-party` and `malformed-edge-acceptance-window` under their own names; the remaining table reasons MAY still be reported as `illegal-source-state`, which is truthful for them. A tool whose contract is to refuse owes the caller a reason it can act on.
+
+**`act` MUST refuse `done` from `disputed`.** In v0.1 it was accepted: the node signed the owner's half of a `disputed → closed` transition whose other half no advertised act can ever reach, leaving a closure honestly recorded and permanently incomplete. §4.4's exits from `disputed` are the two it names; `expired` is the one that ends the edge, and it decides nothing about the merits.
+
+**Acceptance under `on-acceptance` is the elapse of the window, not an act.** §4.4 describes the owed party accepting, and §7 offers no `accept`; rather than add one, this revision states the reading the transition table already implements — `pending-acceptance` resolves when `acceptance_window` elapses from the owner's evidence assertion, and the party owed acts within it by *disputing*, which is the act that changes the outcome. Silence is the acceptance. That is what a window is for.
+
 `act` exists because §4.3's acts were advertised on every list item with no way to invoke any of them — most sharply `release`, the protocol's one unilateral act of forgiveness. Binding it to any tool that produces no assertion (for example a local dismissal) tells a person they have forgiven a debt when the counterparty was never told, and is forbidden by M-20.
 
 ## open_loops
@@ -44,10 +50,15 @@ Serves both inbound proposals and the local extraction-confirmation queue. Every
 { "name": "open_loops",
   "input": { "view":"owe|waiting|pending|closed|all", "persona":"string|null", "limit":"int" },
   "output": { "items":[ { "kind":"commitment|expectation|edge", "id":"...", "intent_or_expect":"...",
-               "counterparty":"...", "verification_level":"0|1|2|3|ext", "age_days":0,
+               "counterparty":{ "value":"...", "origin":"attested|self-labelled" }|null,
+               "verification_level":"0|1|2|3|ext", "age_days":0,
                "due":"...", "state":"...",
                "actions":[ { "act":"done|release|supersede|delegate|ping", "tool":"string|null", "args":{} } ] } ] } }
 ```
+**`counterparty` says where its name came from, and M-12 cannot be enforced without it.** `origin` is `attested` when the name rests on evidence the node holds about a third party, and `self-labelled` when it is an `external_label` (§3.1) — a name *the viewer typed themselves* for someone off-network. A client MUST NOT render an `attested` name above its `verification_level` (M-12); a `self-labelled` name carries no claim about anyone and is rendered whatever the level, because suppressing it would erase the only name that will ever exist for that counterparty and break the solo path §0's base rule protects (M-10).
+
+In v0.1 `counterparty` was a bare string and the two were indistinguishable, so a conforming client could satisfy M-12 only by suppressing both — destroying the offline case — or neither. Every client therefore rendered names at every level, and M-12's client half was unenforceable rather than merely untested. `origin` is what makes it decidable.
+
 `view:"pending"` lists what is awaiting a decision by this persona: inbound `proposed` edges and the local extraction-confirmation queue — exactly the items `confirm` takes as its `id`. It is a view rather than a read mode on `confirm` because it is a list of items like every other view here, and a tool that both reads and writes gives a client two contracts under one name.
 
 ## brief

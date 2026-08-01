@@ -21,7 +21,7 @@ An organization has its own root key pair (generated per §1.1 or HSM-held; cust
 **Attestation object** (`layer: wire`):
 ```json
 {
-  "v": "servanda/0.1",
+  "v": "servanda/0.2",
   "type": "attestation",
   "org": "<org_root_pubkey_hex>",
   "subject": "<persona_or_group_pubkey_hex>",
@@ -43,7 +43,7 @@ An organization has its own root key pair (generated per §1.1 or HSM-held; cust
 
 - An org root MAY be anchored to a DNS domain by publishing `https://{domain}/.well-known/servanda.json`:
 ```json
-{ "v": "servanda/0.1", "org_root": "<pubkey_hex>", "hubs": ["https://hub.example/servanda"] }
+{ "v": "servanda/0.2", "org_root": "<pubkey_hex>", "hubs": ["https://hub.example/servanda"] }
 ```
   and/or a DNS TXT record `_servanda.{domain}` = `v=servanda0.1; k=<pubkey_hex>`.
 - Verifiers MUST check the anchor at signature-verification time and SHOULD cache with the resource's TTL.
@@ -62,11 +62,11 @@ Verification levels, in ascending order of evidence — `0` < `1` < `ext` < `2` 
 
 A `binding_proof` binds a persona key to a channel, never to a human name. Levels `0`, `1` and `ext` therefore carry no display name, and a client at those levels MUST render the persona by its key (or an abbreviation of it) rather than by any name it obtained elsewhere. `display_name` and `handle` are org claims (§1.3) and MUST be rendered only at levels `2` and `3`, and only from a valid, unrevoked attestation. A client MUST NOT combine a name obtained at one level with a level badge earned by different evidence.
 
-**Persona-linking statement** (explicitly user-initiated only): `{v:"servanda/0.1", type:"link", personas:[A,B], sig_A, sig_B}` — both persona keys sign; proves common ownership without exposing the root. Both signatures cover the §0 multi-signature preimage — `sha256(JCS({v, type, personas}))` — and `sig_A` MUST verify against `personas[0]` and `sig_B` against `personas[1]`. A link whose two signature members are byte-identical MUST be rejected.
+**Persona-linking statement** (explicitly user-initiated only): `{v:"servanda/0.2", type:"link", personas:[A,B], sig_A, sig_B}` — both persona keys sign; proves common ownership without exposing the root. Both signatures cover the §0 multi-signature preimage — `sha256(JCS({v, type, personas}))` — and `sig_A` MUST verify against `personas[0]` and `sig_B` against `personas[1]`. A link whose two signature members are byte-identical MUST be rejected.
 
 ## 1.7 Rotation & recovery
 
-- **Rotation statement:** `{"v":"servanda/0.1", "type":"rotation", "old":"<pubkey>", "new":"<pubkey>", "rotated_at":"RFC3339", "sig":"..."}` where `sig` is by `old` over the §0 signing preimage. Implementations MUST emit this form. The signature by `old` is what transfers continuity: verifiers MUST treat `new` as the successor for all open edges of `old`. A rotation statement that carries no signature by `old` MUST be rejected; in particular a statement signed only by `new` MUST be rejected, since it is precisely the takeover this object exists to prevent. Where two distinct rotation statements from the same `old` both verify, a verifier MUST NOT choose between them: continuity stops at the fork and the identity MUST be reported as unresolved.
+- **Rotation statement:** `{"v":"servanda/0.2", "type":"rotation", "old":"<pubkey>", "new":"<pubkey>", "rotated_at":"RFC3339", "sig":"..."}` where `sig` is by `old` over the §0 signing preimage. Implementations MUST emit this form. The signature by `old` is what transfers continuity: verifiers MUST treat `new` as the successor for all open edges of `old`. A rotation statement that carries no signature by `old` MUST be rejected; in particular a statement signed only by `new` MUST be rejected, since it is precisely the takeover this object exists to prevent. Where two distinct rotation statements from the same `old` both verify, a verifier MUST NOT choose between them: continuity stops at the fork and the identity MUST be reported as unresolved.
   - The earlier `sig_old`/`sig_new?` encoding is withdrawn: under the §0 rule every signer of a multi-signature object covers identical bytes, so `sig_new` would have proved nothing `sig_old` does not, and neither would have committed to the other's presence. The residual gap is that no rotation proves the new key's holder consented; a verifier SHOULD therefore require the new key to sign its own first assertion before treating it as active.
 - **Seedless recovery paths** (ADR-0014): (a) org re-attestation of a fresh persona for the same human — org-scope continuity, level 2; (b) rotation statement published over an existing external binding proof channel — the channel is the anchor. A persona with no seed, no org, and no external proof is unrecoverable by design.
 - **Key hierarchy for vault content** (normative restatement of security §5): random content key; wrapped independently per device key and by a passphrase-derived key (Argon2id, params in §9). A device key MUST NOT be the sole custodian of the content key.

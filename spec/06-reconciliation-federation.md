@@ -22,7 +22,7 @@ A recipient MUST discard a message whose `recipient` is not itself, before doing
 
 Hub-bound payloads MUST be encrypted to the recipient's X25519 key using **HPKE (RFC 9180) in Base mode**, ciphersuite **DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / ChaCha20-Poly1305** (`kem_id = 0x0020`, `kdf_id = 0x0001`, `aead_id = 0x0003`). A conforming hub sees: recipient persona_id, ciphertext, timestamps — nothing else. Hubs MUST NOT be able to read or fabricate edges (fabrication is prevented by signature verification at recipients regardless of hub honesty).
 
-`info` MUST be `"servanda/0.1 blind-courier v2" || 0x00 || recipient_persona_id`, per §0's domain-separation rule. Binding the `persona_id` and not merely the X25519 key is deliberate: the key is published in a §6.7 inbox record and a persona may publish a new one, so binding the key alone would tie a payload to whichever key an identity currently advertises rather than to the identity. `aad` MUST be the JCS canonical form of the envelope members a courier can read — `{v, type, recipient, sent_at}` — so those stay readable and become unforgeable.
+`info` MUST be `"servanda/0.1 blind-courier v2" || 0x00 || recipient_persona_id` — **the label keeps its `0.1` spelling in v0.2 for the reason the §0 domain tags do**: it is a KDF context string separating this use of HPKE from every other, not a version marker. Rewriting it would change every ciphertext and buy no separation that is not already there, per §0's domain-separation rule. Binding the `persona_id` and not merely the X25519 key is deliberate: the key is published in a §6.7 inbox record and a persona may publish a new one, so binding the key alone would tie a payload to whichever key an identity currently advertises rather than to the identity. `aad` MUST be the JCS canonical form of the envelope members a courier can read — `{v, type, recipient, sent_at}` — so those stay readable and become unforgeable.
 
 The encapsulated key travels; **no nonce does.** HPKE derives it from the key schedule, so a sender cannot choose, reuse or leak one. One sealed payload per encapsulation: a context MUST NOT be reused across messages.
 
@@ -44,8 +44,12 @@ Periodic pairwise sync between nodes sharing edges:
 
 ## 6.6 Edge recovery (ADR-0014)
 
-- `recover_request`: `{ persona: "<restored persona_id>", proof: "<rotation statement | fresh signature challenge>" }` sent to known counterparties/hubs.
-- `recover_response`: all edges + assertion chains where the requester is a party. Responders MUST verify the persona (or its rotation successor) before answering and MUST NOT include plaintext (hashes only; plaintext recovery is a human act between counterparties).
+- `recover_request`: `{ persona: "<restored persona_id>", proof: { challenge, sig, rotation? } }` sent to known counterparties/hubs.
+- **The proof MUST demonstrate possession of the key it claims.** `challenge` is a fresh nonce and `sig` is a signature over it by the key named in `persona`. Where the requester is recovering under a rotated key, `rotation` carries the §1.8 rotation statement so the responder can follow `old → new`, but the `sig` MUST still be by the **new** key: the rotation says which key succeeds which, and the challenge says who is asking.
+
+  **v0.1 accepted a bare rotation statement as the whole proof, and that was a bulk-disclosure hole.** Rotations are published. A responder verified a genuine signature — by the OLD key, over a public artifact — and returned every edge and every assertion chain for both keys. Any party who merely *observed* a rotation could replay it and harvest the relationship history of both identities without ever holding either key. The signature was never the problem; it attested to the wrong proposition.
+- `recover_response`: all edges + assertion chains where the requester is a party. Responders MUST verify the challenge signature before answering, MUST reject a request whose `proof` carries no `sig` over a `challenge`, and MUST NOT include plaintext (hashes only; plaintext recovery is a human act between counterparties).
+- A responder SHOULD refuse a `challenge` it has already answered, so a captured request is not itself replayable.
 
 ## 6.7 Addressing & offline delivery (added 2026-07-25)
 

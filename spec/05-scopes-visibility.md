@@ -10,7 +10,7 @@ A scope is identified by its controlling key. No deeper nesting in v0.
 ## 5.2 Publish act
 
 ```json
-{ "v":"servanda/0.1", "type":"publish", "edge_id":"...", "scope":"<scope key>",
+{ "v":"servanda/0.2", "type":"publish", "edge_id":"...", "scope":"<scope key>",
   "published_at":"...", "by":"<party pubkey>", "sig":"..." }
 ```
 - Only a **party to the edge** may publish it, and only into scopes the publisher is a member of (valid attestation).

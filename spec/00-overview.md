@@ -1,9 +1,12 @@
 # Servanda Protocol — Specification v0 (draft)
 
-**Status:** v0.1 · FROZEN 2026-08-01 · conformance suite pinned at `0.1.0`
-Normative changes now require a minor bump to `servanda/0.2` (see [GOVERNANCE.md](../GOVERNANCE.md),
-Versioning). The pre-freeze exception that let normative text land without a bump ended with this
-line.
+**Status:** DRAFT v0.2 · open 2026-08-01 · previous version **v0.1, FROZEN**, tag `v0.1`, suite `0.1.0`
+
+v0.1 is frozen and stays frozen: its text is the `v0.1` tag and nothing on this branch changes it.
+This branch is `servanda/0.2`, and everything normative that lands here carries that version
+string. There is no compatibility path between the two — the `v` field on every wire message
+exists so a 0.1 node refuses a 0.2 message rather than misinterpreting it (GOVERNANCE.md,
+Versioning). The pre-freeze exception is over; it does not return for 0.2.
 **Name:** Servanda — from *pacta sunt servanda* ("agreements must be kept"). The name is settled
 and **no trademark will be registered** (#1). It is descriptive Latin in the public domain; no
 clearance search was run, so it is used without any claim that it is free of others' rights. The
@@ -50,8 +53,10 @@ Informative appendices (not normative, not part of the conformance suite):
   | envelope `id` | `servanda/0.1:envelope_id` | §2 |
 
   Signing preimages are **not** domain-separated: a signature is bound to its object by that object's own `type` and `v` members, which are inside the canonical form. Implementations MUST NOT add a domain tag to a signing preimage.
+
+  **The tags keep saying `0.1` in v0.2, and that is deliberate.** A domain tag separates one identifier from another, not one version from another — its whole job is that a `commitment_hash` preimage can never be read as an `edge_id` preimage. The version a reader needs is carried by `v`, which is inside every canonical form and is what makes a 0.1 node refuse a 0.2 message. Bumping the tags would recompute every `commitment_hash`, every `edge_id` and every envelope `id` in existence, invalidate every signature made against them, and break the `evidence_refs` pointing at them (§3.1) — for no separation that is not already there. A tag is therefore a constant, not a version marker, and it will keep this spelling across minors.
 - `layer: vault` objects never leave the owner's vault. `layer: wire` objects may cross node boundaries.
-- Protocol version string: `servanda/0.1`. Every wire message carries `v`.
+- Protocol version string: `servanda/0.2`. Every wire message carries `v`. A node MUST refuse a message whose `v` it does not implement rather than interpret it: pre-1.0 there is no compatibility between minors, and the six resolutions in this revision each change what a message means.
 
 ## Layering
 
