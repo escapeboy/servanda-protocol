@@ -91,6 +91,8 @@ The reason is that both windows in this specification — `acceptance_window` he
 
 **What this rule buys, and what it does not.** It closes the observed attack, which needs two assertions by one signer with the later one backdated. It does NOT stop a party backdating its *first* assertion in a chain, because there is nothing earlier by that signer to compare against and this protocol has no trusted clock. **A window between two self-asserted instants is therefore evidence about a cooperating counterparty and MUST NOT be relied on against a hostile one.** A node MAY additionally refuse an assertion dated in its own future; that is local policy, not conformance, because two honest nodes disagree about *now* and the protocol has no way to say which is right.
 
+**It also does not survive §6.4 reconciliation, and that is a property of reconciliation rather than a gap in this rule.** A recon batch is normalised by `asserted_at` before it is applied, because §4.2 carries no `prev` link and the timestamps are the only causal signal on the wire. A backdated assertion therefore sorts into the position its own timestamp claims, and the reconstructed chain is monotonic. Checking arrival order instead would buy nothing: the party this rule constrains is the one composing the batch, and it would sort before sending. The rule binds where it can bind — the local signing path, where a node holds the earlier assertion already and refuses to help its own owner backdate.
+
 ## 4.4 Closure
 
 - `on-evidence`: a `closed` assertion by the owner with non-null `evidence_hash` (hash of the verification adapter's evidence bundle) closes the edge.
