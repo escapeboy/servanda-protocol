@@ -121,8 +121,21 @@ export function actionsFor(
 
     case 'pending-acceptance':
       if (role === 'owed_to') {
-        // The counterparty may still accept explicitly or dispute; `release` remains theirs.
-        return [advertise('release', { ...id, act: 'release' }), advertise('supersede')];
+        // NOT `release`. §4.3 gives `pending-acceptance` three rows and `released` is not among
+        // them, so M-20 — "a node MUST NOT advertise an act the transition table does not
+        // authorize the requesting persona to SIGN in the item's current state" — forbids
+        // offering it. `release` is tool-bound, so the gate reaches it.
+        //
+        // §4.4's `contested-closure` does accept a `released` here, but only one dated at or
+        // before the owner's evidence assertion — a CONCURRENT act, made without sight of it. An
+        // act a client offers now would be dated now, which is later, which is refused. Offering
+        // it would be telling the counterparty they may forgive a debt and then discarding the
+        // assertion, which is the exact failure M-20 exists to prevent.
+        //
+        // What §4.3 actually gives them here — explicit acceptance, and dispute — has no act in
+        // §7's closed vocabulary, so nothing tool-bound can be advertised. That gap is real and
+        // named in §7 rather than papered over with an act that would not stick.
+        return [advertise('supersede')];
       }
       // Owner: tacit acceptance only once the window has elapsed (§4.3).
       return windowElapsed
