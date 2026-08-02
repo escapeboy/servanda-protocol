@@ -14,7 +14,7 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 |---|---|---|
 | 1 | Every §8 MUST is accounted for, in a category that says what it is | **met** — four categories, listed below ([#42](../../issues/42)) |
 | 2 | A second implementation, written from the specification and vectors alone | **met** — `servanda-py`, Node PASS 176/176, claim granted |
-| 3 | No known divergence between the specification and the reference implementation | **NOT met** — §1.7 rotation is unimplemented |
+| 3 | No known divergence between the specification and the reference implementation | **met** — §1.7 implemented; the gate is a universal negative and is only ever provisional |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
 | 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open until **2026-08-16** — see the register below |
 
@@ -56,31 +56,59 @@ which is how §8 came to claim two vector families that had never existed.
 anonymous credentials for cross-org level-3, post-quantum suites. §9.6 records why each is
 deferred rather than treating them as one bundle.
 
-## Gate 3: §1.7 rotation is prose
+## Gate 3, and why a universal negative is never really "met"
 
-The gate read "met" on the strength of one divergence being closed (§2's connector transport).
-It is a universal negative and one example does not support it — which S8 said at the time, and
-which S5 then demonstrated by finding another.
+**§1.7 is implemented.** A vault record type, an ingestion path with three gates, and a transition
+table that resolves each party to the keys it has held. What follows is kept because the gate read
+"met" once before on weaker evidence, and the shape of that mistake is the useful part.
 
-**§1.7's central MUST is unimplemented.** *"The signature by `old` is what transfers continuity:
-verifiers MUST treat `new` as the successor for all open edges of `old`."* In the reference
-implementation:
+### What it was
 
-- `resolveSuccessor` exists, is correct, and has **no production caller** — only tests.
-- `Vault` has **no rotation record type at all**, so a counterparty holding a valid rotation
-  statement has nowhere to put it.
-- Consequently: a rotated key on its own open edge is refused `signer-not-a-party`, and over the
-  wire the counterparty's inbox discards it `sender-is-not-a-party`.
+§1.7's central MUST — *"verifiers MUST treat `new` as the successor for all open edges of
+`old`"* — was prose. `resolveSuccessor` existed, was correct, and had **no production caller**.
+`Vault` had no rotation record type, so a counterparty holding a valid statement had nowhere to
+put it. §1.7 lists rotation as one of two seedless recovery paths and ADR-0014 argues a persona
+survives the loss of a device; it did not. A 566-day story that rotated a key continued only
+because the persona still held the seed — **the recovery path for the case where you have lost
+everything worked only when you had lost nothing.**
 
-What makes this worth naming rather than filing quietly is what it costs. §1.7 lists rotation as
-one of two seedless recovery paths, and ADR-0014's whole argument is that a persona survives the
-loss of a device. It does not: the story S5 ran only continued because the persona still held the
-seed — that is, because the rotation was unnecessary. **The recovery path that exists for the case
-where you have lost everything works only when you have lost nothing.**
+### The three gates, and why possession is not enough
 
-Not fixed here. It is a feature, not a patch — a vault record type, an ingestion path, and a
-transition table that accepts a successor key — and doing it badly under time pressure is how a
-key-continuity mechanism becomes an account-takeover vector. Recorded as the gate it blocks.
+A rotation is a PUBLISHED artefact — that is the whole point of the second seedless path. §6.6
+already learned what follows: anyone who merely OBSERVED one could replay it, and a signature that
+verifies is not proof that the person it names is the one talking to you. So a node accepts a
+statement only when it verifies under the key it rotates FROM, arrives from one of its own two
+keys, and concerns a key that is party to an edge this node holds. The last one is not politeness:
+without it any persona that can reach you fills your vault with rotations about strangers, an
+unbounded store keyed by attacker-chosen values in a place §6.5's proposal budget does not look.
+
+There is deliberately no further "proof" gate. §1.7's residual note asks a verifier to require the
+new key to sign its own first assertion before treating it as active, and that is exactly what
+happens: the successor becomes real by ACTING, and the transition table judges that act like any
+other. No window exists in which the successor is trusted without having done anything.
+
+### The rule that was nearly got wrong
+
+Resolving a party to its newest key **invalidates its own history**. Every assertion the party
+signed before rotating stops verifying, so the chain that opened the edge collapses and the edge
+is not continued but erased. §1.3 had already settled this for revocation — *"edges signed before
+`revoked_at` remain valid (offboarding semantics)"* — and the reasoning is identical: a key that
+was current when it signed was current when it signed.
+
+So a party resolves to a LINEAGE, each key valid up to the rotation that replaced it, and only the
+newest one open. Going forward only the newest acts, which is the point: §1.7 exists for the case
+where the old key is lost or compromised, and a rotation that merely ADDED a key would leave the
+compromised one working beside its replacement.
+
+At a fork, continuity stops and both candidate keys are strangers to the edge — §1.7's own rule,
+and the safe direction to fail in.
+
+### Why this gate stays provisional
+
+It is a universal negative, and one example never supports one. It read "met" on the strength of
+§2's connector requirement being withdrawn, and two more divergences were sitting behind that
+sentence at the time. Nothing about implementing §1.7 makes the next one less likely; it makes it
+unlooked-for, which is different.
 
 ## Gate 2, and what "independent" was narrowed to mean
 
