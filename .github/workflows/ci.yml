@@ -53,6 +53,21 @@ jobs:
       - name: JSON Schema validation of all vectors
         run: node dist/validate.js
 
+      # The conformance runner, proven BOTH directions on every push.
+      #
+      # Its selftest asserts the fault set as an EXACT set: eight injected faults across eight
+      # families must produce exactly eight failures, and a correct RFC 8785 stub must pass its
+      # own family on merit and decline the rest. A runner demonstrated only against a correct
+      # implementation has not been demonstrated to fail; one demonstrated only against a broken
+      # one has not been demonstrated to pass. This suite has shipped checks that could not fail
+      # often enough that proving both directions is the standard here.
+      #
+      # No `npm ci`: the runner has zero dependencies, deliberately, because an outside
+      # implementer should be able to run it without adopting this repository's toolchain.
+      - name: Conformance runner selftest
+        working-directory: ${{ github.workspace }}/tools/conformance-runner
+        run: node selftest.mjs
+
       # Belt and braces: prove `npm run generate` leaves the working tree untouched, so a
       # hand-edited vector cannot survive even if it happens to satisfy the self-check.
       - name: Regenerate and assert no diff
