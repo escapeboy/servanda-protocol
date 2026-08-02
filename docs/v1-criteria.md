@@ -171,6 +171,18 @@ Neither was reachable from inside. The reference implementation and the generato
 agree with each other, and agreement between two things written by the same author is not evidence
 about the text.
 
+**And a third, from the same source on its second run.** §4.3's "the three `pending-acceptance`
+rows are all of them" — added the same morning — contradicts §4.4's contest rule, which must fire
+from `pending-acceptance` or an `on-acceptance` edge never converges. A cold reader hit the
+contradiction, could not resolve it from the text, and worked out the right answer by reasoning
+about §6.4 convergence instead. That is the definition of an under-specified sentence: correct
+behaviour reachable only by rederiving why the rule exists.
+
+It is worth noticing where all three came from. Not one is a defect in the Python. Every one is a
+place where this specification said less than it meant, or two of its sections disagreed — and
+each was invisible from inside, because the reference implementation and the generator agree with
+each other and agreement between two things one author wrote is not evidence about the text.
+
 **What it still is not:** an independent author. Every implementation this project can
 produce shares the priors of the one that wrote the specification, so the classes of mistake
 nobody thought to look for stay unlooked-for. Meeting the narrowed gate is worth doing; calling it
