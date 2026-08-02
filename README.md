@@ -2,11 +2,12 @@
 
 *Servanda — from* pacta sunt servanda *("agreements must be kept").*
 
-> **Status: v0.1 — FROZEN (2026-08-01).**
-> Wire formats, hashes and the transition table are fixed for `servanda/0.1`. A normative change
-> now requires a minor bump to `servanda/0.2`; the `v` field on every wire message exists so a
-> node can refuse rather than misinterpret. The conformance suite in `vectors/` is pinned at
-> `0.1.0` and is what "implements Servanda" means (§8).
+> **Status: DRAFT v0.2 — open. Previous version v0.1, FROZEN, tag `v0.1`, suite `0.1.0`.**
+> v0.1's text is the `v0.1` tag and nothing on this branch changes it. This branch is
+> `servanda/0.2`, and everything normative here carries that version. There is no compatibility
+> path between the two — the `v` field on every wire message exists so a 0.1 node refuses a 0.2
+> message rather than misinterpreting it. Passing the conformance suite in `vectors/` is what
+> "implements Servanda" means (§8), and with no registered mark it is the only thing that is.
 >
 > **Frozen is not audited.** The cryptography has not been reviewed by an external cryptographer —
 > see [SECURITY.md](SECURITY.md), which is exact about which freeze gates closed by review, which
@@ -38,7 +39,7 @@ Normative. Key words per RFC 2119.
 | 5 | [spec/05-scopes-visibility.md](spec/05-scopes-visibility.md) | scopes, publish act, visibility rules |
 | 6 | [spec/06-reconciliation-federation.md](spec/06-reconciliation-federation.md) | messages, transports, blind courier, edge recovery |
 | 7 | [spec/07-node-surface.md](spec/07-node-surface.md) | node MCP tool contract |
-| 8 | [spec/08-conformance.md](spec/08-conformance.md) | consolidated MUSTs (M-1…M-16), conformance levels |
+| 8 | [spec/08-conformance.md](spec/08-conformance.md) | consolidated MUSTs (M-1…M-21), conformance levels |
 | 9 | [spec/09-threat-model.md](spec/09-threat-model.md) | normative security appendix |
 
 Design rationale documents (`docs/`, referenced from the spec text) and the ADR series
@@ -53,6 +54,15 @@ Design rationale documents (`docs/`, referenced from the spec text) and the ADR 
 - [`signatures/`](vectors/signatures) — Ed25519 over `sha256(JCS(obj sans sig))` for attestations, assertions, rotation
 - [`derivation/`](vectors/derivation) — BIP-39 → SLIP-0010 `m/7391'/{i}'` persona keys
 - [`transitions/`](vectors/transitions) — valid **and invalid** assertion sequences per §4.3; the invalid ones define M-14
+- [`envelope/`](vectors/envelope) — the §2 `id` preimage, and every M-19 bound with a case on each side of it
+- [`node-surface/`](vectors/node-surface) — §7 advertised acts, `act` calls, `brief` slots, and the §1.6 ladder
+- [`addressing/`](vectors/addressing) — §6.7 inbox records and the out-of-band bootstrap payload
+- [`recovery/`](vectors/recovery) — §6.6, where a bare published rotation must NOT be accepted as proof
+
+[`vectors/README.md`](vectors/README.md) carries the full table with per-family counts. **What is
+NOT covered is written down too**: eight MUSTs have no vector at all, tracked as
+[#42](../../issues/42), and by `GOVERNANCE.md`'s own rule an uncovered behaviour is not yet a
+conformance requirement.
 
 Vectors are generated deterministically by [`tools/vectors-gen/`](tools/vectors-gen) and are checked
 in. `npm test` regenerates them and fails on any drift. See [vectors/README.md](vectors/README.md)
@@ -83,12 +93,13 @@ This repository contains **the specification and its conformance vectors only**.
 lives here, and none is required to read the spec.
 
 - The spec defines the wire: objects, canonicalization, hashes, signatures, the transition table,
-  visibility rules, and the five-tool node surface (§7).
+  visibility rules, and the six-tool node surface (§7).
 - An implementation claims conformance by passing the conformance suite (§8) — the vectors here plus
   the property tests that grow alongside them. The suite, not a blessed codebase, is the definition
   of "implements Servanda".
-- The reference implementation is a separate repository (not yet published). Everything — spec text,
-  tooling, vectors, and the reference implementation — is Apache-2.0.
+- The reference implementation is a separate repository, [escapeboy/servanda](https://github.com/escapeboy/servanda),
+  published under the same licence. Everything — spec text, tooling, vectors, and the reference
+  implementation — is Apache-2.0.
 - Reference-impl-only requirements (trust gradient, autonomy ceilings — §9.4) are explicitly **not**
   wire-protocol matters. Do not implement them to be conformant; implement them to use the brand.
 
@@ -102,8 +113,12 @@ The fastest useful contributions right now:
 
 - Attack the transition table. An invalid sequence that a naive verifier accepts is a bug in §4.3.
 - Add canonicalization vectors that break a plausible implementation.
-- Answer an open question — issues [#1](../../issues/1)–[#8](../../issues/8) are the unresolved
-  design decisions, each blocking some part of v0.1.
+- **Write a second implementation.** With no registered mark, the suite is the only answer to a
+  conformance claim — and a suite only its author has passed proves that the code agrees with
+  itself. Start from [docs/implementer-packet.md](docs/implementer-packet.md). A disagreement
+  between two independent readings is the most valuable thing this project can receive; file it as
+  an issue rather than a patch, and the vector is presumed right until argued otherwise.
+- **Close a coverage gap** — [#42](../../issues/42) lists the MUSTs with no vector behind them.
 
 ## License
 

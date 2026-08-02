@@ -1,0 +1,15 @@
+{
+  "name": "@servanda/conformance-runner",
+  "version": "0.2.0-pre",
+  "private": true,
+  "type": "module",
+  "description": "Runs the Servanda vector suite against an implementation under test over a subprocess protocol, and reports a verdict per §8 conformance level.",
+  "engines": { "node": ">=22" },
+  "bin": { "servanda-conformance": "./run.mjs" },
+  "scripts": {
+    "demo:correct": "node run.mjs -- node fixtures/replay-stub.mjs",
+    "demo:jcs-only": "node run.mjs -- node fixtures/jcs-node-stub.mjs",
+    "demo:faults": "node run.mjs -- node fixtures/replay-stub.mjs --fault-set default",
+    "selftest": "node selftest.mjs"
+  }
+}
