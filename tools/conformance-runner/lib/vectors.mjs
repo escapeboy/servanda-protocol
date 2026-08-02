@@ -264,6 +264,50 @@ function expectedPins(expected) {
   return Object.entries(expected).map(([k, v]) => pin(k, v));
 }
 
+/**
+ * What a result may contain, per op, taken from PROTOCOL.md's operations table.
+ *
+ * The runner used to compare only the PINNED members and ignore everything else, so a node could
+ * return whatever it liked beside them and still pass. That is not a hypothetical: a deliberately
+ * hostile implementation passed all 195 cases while attaching
+ * `advertise_actions.ui.primary_label = "Approve & release funds"` — node-authored affordance
+ * copy, which is precisely what M-21 forbids — plus a display name on a case pinning
+ * `display_name: null`, and an edge preview on every refusal to serve.
+ *
+ * Those are the holes an HONEST implementation falls into by accident, which is what makes this
+ * worth closing. Memorising the vectors cannot be stopped by any vector family — a fixed corpus is
+ * always bakeable — but "a node MUST NOT put copy on the wire" can be, and it is the node halves
+ * of M-21 and M-12 that this reaches.
+ */
+export const RESPONSE_MEMBERS = {
+  canonicalize: ['canonical', 'sha256'],
+  commitment_hash: ['commitment_hash', 'hash_preimage_canonical', 'hash_preimage_hex'],
+  envelope_id: ['id', 'canonical', 'id_preimage_hex'],
+  envelope_bounds: ['measured', 'within_bounds'],
+  clip_to_octets: ['clipped'],
+  bip39_seed: ['seed'],
+  derive_key: ['path', 'chain_code', 'private_key', 'public_key', 'persona_id'],
+  signing_preimage: ['canonical', 'sha256_preimage', 'verifies', 'reason'],
+  verify_transitions: ['outcomes', 'final_state', 'unverifiable'],
+  verify_inbox_record: ['canonical', 'accepted', 'rejection_reason', 'actual_signer'],
+  oob_bootstrap: [
+    'canonical',
+    'payload_b64url',
+    'url',
+    'signature_verifies',
+    // Named in PROTOCOL.md's shape and deliberately not compared (README findings/5), which is a
+    // reason to permit them and not a reason to permit anything else.
+    'decoded_equals_original',
+    'edge_equals_original',
+  ],
+  recover_request: ['accepted', 'reason'],
+  may_serve_edge: ['serve', 'via', 'scope', 'reason'],
+  advertise_actions: ['effective_state', 'actions'],
+  act: ['accepted', 'rejection_reason', 'asserts'],
+  judge_brief_slot: ['valid', 'rejection_reason'],
+  grade_verification: ['level', 'display_name', 'name_bearing', 'counterparty'],
+};
+
 const FILES = {
   canonicalization: 'canonicalization/jcs.json',
   derivation: 'derivation/persona-keys.json',

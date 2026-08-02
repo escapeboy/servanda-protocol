@@ -67,6 +67,10 @@ const JCS = ['--', 'node', resolve(HERE, 'fixtures/jcs-node-stub.mjs')];
     // skipped the rule entirely would answer.
     'visibility#a-scope-member-is-refused-an-UNPUBLISHED-edge',
     'transitions-invalid#collective-edge-with-neither-children-nor-coordinator',
+    // v0.2, twelfth: node-authored affordance copy attached to a CORRECT answer. Invisible until
+    // the runner started checking what a result carries as well as what it says — the shape hole
+    // an honest implementation falls into, where memorising the corpus is the one it cannot.
+    'node-surface-actions#open-owed-to',
   ];
   const { exit, report } = run('faults', ['--claim', 'node,federating-node', ...STUB,
     '--fault-set', 'default']);
@@ -77,7 +81,8 @@ const JCS = ['--', 'node', resolve(HERE, 'fixtures/jcs-node-stub.mjs')];
   check('faults: both claims refused', report.claims.every((c) => !c.granted));
 
   const byId = Object.fromEntries(report.levels.map((l) => [l.id, l]));
-  check('faults: node fails on its eight', setEq(byId.node.failed, [
+  check('faults: node fails on its nine', setEq(byId.node.failed, [
+    'node-surface-actions#open-owed-to',
     'signatures#signed-by-a-different-key',
     'canonicalization#string-escapes-solidus',
     'transitions-invalid#owner-self-confirms',

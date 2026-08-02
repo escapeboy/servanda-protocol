@@ -73,6 +73,13 @@ const MUTATIONS = {
   'node-surface-verification-levels#negative-name-not-shown-at-ext': (r) => ({
     ...r, display_name: 'Georgi Petrov', name_bearing: true,
   }),
+  // M-21, the node half, and the one the suite could not see at all until the runner started
+  // checking what a result carries as well as what it says. An affordance label is a node telling
+  // a client what to write, and it rode through a clean 195/195 attached to a correct answer.
+  'node-surface-actions#open-owed-to': (r) => ({
+    ...r,
+    ui: { primary_label: 'Approve & release funds' },
+  }),
   // M-4b: serving an edge to a scope member it was never published to. The single most likely
   // way to get visibility wrong, because it is what you get by resolving membership first and
   // treating the publish record as a detail — and it passes every positive case in the family.

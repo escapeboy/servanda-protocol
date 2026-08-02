@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadFamilies, suiteMetadata, deepEqual } from './lib/vectors.mjs';
+import { loadFamilies, suiteMetadata, deepEqual, RESPONSE_MEMBERS } from './lib/vectors.mjs';
 import { Iut } from './lib/driver.mjs';
 import { computeLevels, render } from './lib/report.mjs';
 
@@ -66,6 +66,28 @@ exit: 0 all good  1 a case failed or the pipe broke  2 a claimed level was not g
 
 function compare(kase, result) {
   const details = [];
+
+  // A result may contain what PROTOCOL.md says it contains, and nothing else.
+  //
+  // Comparing only the PINNED members let a node return anything beside them. A hostile
+  // implementation passed all 195 cases while attaching node-authored affordance copy to
+  // `advertise_actions`, a display name to a case pinning `display_name: null`, and an edge
+  // preview to every refusal — M-21 and M-12 walked straight through, because the suite was
+  // checking what a node SAYS in the fields it was asked about and not what else it says.
+  //
+  // This cannot stop an implementation that memorises the corpus; no vector family can, since a
+  // fixed corpus is always bakeable. It closes the hole an HONEST implementation falls into.
+  const permitted = RESPONSE_MEMBERS[kase.op];
+  if (permitted !== undefined) {
+    const extra = Object.keys(result).filter((k) => !permitted.includes(k));
+    if (extra.length > 0) {
+      details.push(
+        `result carries member(s) \`${extra.join('`, `')}\` that ${kase.op} does not define. ` +
+          `PROTOCOL.md permits: \`${permitted.join('`, `')}\``,
+      );
+    }
+  }
+
   for (const { field, expected } of kase.pins) {
     if (!(field in result)) {
       details.push(`missing field \`${field}\` in result (expected ${show(expected)})`);
