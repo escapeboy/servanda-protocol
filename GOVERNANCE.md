@@ -102,6 +102,22 @@ Every released version tags the repository and pins the vectors that define it.
   conformance from being an argument about interpretation.
 - Consequently, the correct response to "the spec says X but nothing tests X" is a PR adding the
   vector — and that PR is `editorial-with-vectors`, not normative.
+- **And the mirror, which had no rule until an independent implementation walked into it.** When a
+  vector pins behaviour the spec does not state, the suite has stopped testing conformance-to-spec
+  and started testing conformance-to-**generator**. An implementer who reads the specification
+  carefully then fails, and the more carefully they read the worse they do — which is the exact
+  inversion of what a suite is for.
+
+  The correct response is NOT to change the vector. It is to decide, in normative text, which of
+  two things is true: the behaviour is required, and §-text now says so; or it is
+  implementation-defined, and §-text says *that* and the vector stops pinning it. Either way the
+  resolution lands in the spec, and either way it is normative — so it bumps the minor version.
+
+  This is how #44 was resolved: six surface rules — advertised-act gating, `actions` array order,
+  where `ping` belongs, the reason-projection table, whether the canonical-form bound includes
+  `id`, and what a "level" is — had been decided by the generator and by no sentence anyone could
+  read. No vector value changed. The suite had been right the whole time and the specification had
+  been silent, which is the failure mode this clause exists to name.
 - Use of the protocol name is gated on passing the suite (ADR-0001). **There is no registered mark
   and there will not be one** (#1), so the suite is not one defence among three — it is the one
   that has to hold. A claim of "implements Servanda" is answerable here and nowhere else.
