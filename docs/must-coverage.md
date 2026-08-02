@@ -2,6 +2,17 @@
 
 *Informative. This document describes the conformance suite; `spec/` and `vectors/` define it.*
 
+> **STALE as of 2026-08-02, and left in place rather than half-fixed.** The suite has grown from
+> 165 cases to 195: `vectors/visibility/matrix.json` is new (M-4), `transitions/` gained
+> `expected_unverifiable` and four collective-edge cases (M-8, M-9), and `signatures/` gained
+> `known_keys`. So "eight MUSTs have no case" below is now five, and every count of 165 is wrong.
+>
+> The per-row analysis has NOT been redone, and patching the numbers without redoing it would
+> produce a document that looks current and is not — which is worse than one that says it is
+> behind. Two findings in it survive the growth and are not recorded anywhere else, so read those
+> even while the counts are wrong: **M-17 and M-18 belong to no conformance level**, and the
+> **Client level has no vectors of its own** — every case pins what a node emits.
+
 §8 lists twenty-one MUSTs and, separately, four conformance levels. It does not say which vector
 cases exercise which MUST, so a claim of "Node-conformant" names a level whose contents nobody has
 written down. This document writes them down.

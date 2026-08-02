@@ -12,7 +12,7 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 
 | # | Gate | State |
 |---|---|---|
-| 1 | Every §8 MUST is either covered by a vector or **counted** as a prose obligation, with no third category | **met** — five prose obligations, each with its reason ([#42](../../issues/42)) |
+| 1 | Every §8 MUST is accounted for, in a category that says what it is | **met** — four categories, listed below ([#42](../../issues/42)) |
 | 2 | A second implementation, written from the specification and vectors alone | **met** — `servanda-py`, Node PASS 176/176, claim granted |
 | 3 | No known divergence between the specification and the reference implementation | **met** — §2's connector-transport requirement was withdrawn |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
@@ -34,6 +34,23 @@ the same reasoning that would have to be reversed to restore it:
 So: **v1 may be declared without a cryptographic review, and `SECURITY.md` says plainly that none
 has happened.** That sentence is the deliverable, not the audit. An implementer who needs
 assurance obtains it independently, and the specification tells them clearly that they must.
+
+## Gate 1: four categories, not two
+
+This gate was written as "covered by a vector **or** counted as a prose obligation, with no third
+category", and §8 has four. The gate's wording was wrong, not §8 — collapsing these would hide
+exactly the distinctions that make the count meaningful:
+
+| Category | MUSTs | What it means |
+|---|---|---|
+| **Covered** | M-2, M-4, M-8, M-9, M-12, M-14, M-17, M-18, M-19, M-20, M-21 | A vector case exercises the rule and pins the outcome |
+| **Partial** | M-1, M-3, M-7 | Exercised in part. M-1 and M-3 have named negative cases in `transitions/invalid.json`; M-7's first half is pinned by `hashing/` and its second half ("plaintext never appears in a wire object") is a negative no vector demonstrates |
+| **Prose obligation** | M-5, M-6, M-11, M-15, M-16 | No vector can reach them, for the reasons §8 gives per rule. Not work outstanding — the count that CAN fall is the one above |
+| **Not a gap** | M-10, M-13 | Uncovered and unreachable by construction: one is a property of a deployment, the other of key custody. §8 names them so a reader counting does not count them as debt |
+
+The categories are the deliverable, not the totals. "Eight uncovered" and "five uncovered" were
+both true statements about different sets, and it was possible to say either without noticing —
+which is how §8 came to claim two vector families that had never existed.
 
 **The four §9.6 items** — threshold group signing, formal verification of the transition table,
 anonymous credentials for cross-org level-3, post-quantum suites. §9.6 records why each is
@@ -70,7 +87,7 @@ node run.mjs --vectors ../../vectors --claim node -- python3 .../servanda_node.p
 That it computes rather than replays was checked rather than assumed: it reads no vector file,
 and its only JSON parsing is of the request it was handed.
 
-**It earned its keep on the first run** — see the finding below.
+**It earned its keep on the first run** — two defects, both below.
 
 ### What it found
 
@@ -89,6 +106,17 @@ Fixed by supplying `known_keys`, exactly as `verify_inbox_record` already did an
 stated reason. Naming the keys never rescues a bad signature; it lets a refusal say something
 true.
 
+**And §7's `args` was a partial tool input while the prose said "verbatim".** The vectors pin
+`{id, act}` for `done` — without the `evidence_hash` that `act`'s own input schema requires. Both
+cannot be true: passed verbatim, `{id, act}` is a malformed call. The vectors were right. §7 now
+states the shape per member and says why `evidence_hash` is excluded — only the caller can produce
+evidence, and a node filling it in would be asserting on the caller's behalf (M-13). Seventh
+instance of `GOVERNANCE.md`'s mirror rule, and the first found from outside.
+
+Neither was reachable from inside. The reference implementation and the generator's own verifier
+agree with each other, and agreement between two things written by the same author is not evidence
+about the text.
+
 **What it still is not:** an independent author. Every implementation this project can
 produce shares the priors of the one that wrote the specification, so the classes of mistake
 nobody thought to look for stay unlooked-for. Meeting the narrowed gate is worth doing; calling it
@@ -101,8 +129,19 @@ project making elsewhere.
 constitutional one **30**. That rule was written to stop one author deciding alone, so a register
 of what is inside the window belongs where the gate is, not in a commit message.
 
+**The register below covered one day and the gate says "every".** It was written on 2026-08-02
+listing that afternoon's changes, and `servanda/0.2` opened on 2026-08-01 — so everything between
+the freeze and that afternoon was missing, including the day's largest security fix. Found by
+diffing this table against `git log`, which is the only way it was ever going to be found.
+
 | Change | Class | Landed | Window ends |
 |---|---|---|---|
+| §1.5 the anchor TXT version does not follow the wire version (`d25985d`) | normative | 2026-08-01 | 2026-08-15 |
+| §4.3 the backdating rule does not survive recon (`03e98ce`) | normative | 2026-08-01 | 2026-08-15 |
+| §8 what a client conformance harness must be (`9977dbb`) | normative | 2026-08-01 | 2026-08-15 |
+| §6.1 a challenge signature names the hub it is for (`b53b585`) | normative | 2026-08-02 | 2026-08-16 |
+| #44 six surface rules the vectors were deciding (`11716a4`) | normative | 2026-08-02 | 2026-08-16 |
+| §7 `args` is a partial tool input (`cf62083`) | normative | 2026-08-02 | 2026-08-16 |
 | §4.1 an unbound `edge_id` is refused | normative | 2026-08-02 | 2026-08-16 |
 | §0 signing-preimage stripping is top-level only | normative | 2026-08-02 | 2026-08-16 |
 | §9.3 two Argon2id profiles, passphrase-generation MUST, required re-wrap path | normative | 2026-08-02 | 2026-08-16 |
@@ -112,6 +151,13 @@ of what is inside the window belongs where the gate is, not in a commit message.
 | §4.7 `expected_unverifiable`, M-8 and M-9 covered | editorial-with-vectors | 2026-08-02 | — |
 | §5.3 visibility matrix, M-4 covered | editorial-with-vectors | 2026-08-02 | — |
 | §9.6 deferred past v1; external review removed as a gate | editorial | 2026-08-02 | — |
+
+**§6.1 landed with no vector, and `GOVERNANCE.md` says a normative PR MUST update `vectors/` in
+the same PR.** It is the one entry here that is not merely late to the register: the audience
+binding is a wire-visible rule, a vector can pin it, and none does. Until one exists, a conforming
+implementation may omit the check and pass the suite — which is `GOVERNANCE.md`'s own rule that an
+uncovered behaviour is not yet a conformance requirement, applied to the day's largest security
+fix. **Outstanding work, not bookkeeping.**
 
 None is constitutional: nothing above touches the thirteen README principles. The
 editorial-with-vectors rows carry no window by `GOVERNANCE.md`'s own rule — they add cases for

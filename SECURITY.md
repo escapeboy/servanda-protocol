@@ -26,8 +26,12 @@ distinction matters when you are deciding what to trust:
 - **Still resting on the editors' judgement.** The §9.3 Argon2id profiles, and the §3.2 commitment
   hash preimage with its five-field domain.
 
-An adversarial pass in August 2026 found nine breaks in the reference implementation, six of which
-were fixed. **It was run by agents the editor spawned, which makes it the editor reviewing the
+An adversarial pass in August 2026 found nine breaks — eight in the reference implementation, of
+which six were fixed, and one in this SPECIFICATION: §6.1's inbox-authentication challenge named
+no audience, so a signature produced for one hub opened that persona's queue at every hub in its
+§6.7 list. Recording it as an implementation break, as this page did, put a specification defect
+in the wrong column: the reference implementation was faithfully implementing text that was
+wrong. **It was run by agents the editor spawned, which makes it the editor reviewing the
 editor** — same priors, no independent selection, no accountability. It is not a review and is
 recorded here so that it is never mistaken for one.
 
