@@ -13,10 +13,10 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 | # | Gate | State |
 |---|---|---|
 | 1 | Every §8 MUST is either covered by a vector or **counted** as a prose obligation, with no third category | **met** — five prose obligations, each with its reason ([#42](../../issues/42)) |
-| 2 | A second implementation, written from the specification and vectors alone | **met** — see below |
+| 2 | A second implementation, written from the specification and vectors alone | **NOT met** — see below |
 | 3 | No known divergence between the specification and the reference implementation | **met** — §2's connector-transport requirement was withdrawn |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
-| 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open, and it is time rather than work |
+| 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open until **2026-08-16** — see the register below |
 
 ## What is deliberately NOT a gate
 
@@ -47,15 +47,58 @@ reformulated, and the reformulation is a narrowing that should be visible rather
 > A second implementation, written from `spec/` and `vectors/` alone, with no access to the
 > reference implementation, which passes the conformance suite.
 
-That is what was produced: a Python derivation built from the specification and the vectors, which
-found six disagreements — three of them defects in the reference implementation. It is real
-evidence and it did real work.
+A Python derivation was built from the specification and the vectors, and it did real work: it
+found six disagreements, three of them defects in the reference implementation, all since fixed.
 
-**What it is not:** an independent author. Every implementation this project can produce shares
-the priors of the one that wrote the specification, so the classes of mistake nobody thought to
-look for stay unlooked-for. The narrowed gate is met; the broader one is not, and calling the
-narrowed one "independent implementation" without this paragraph would be the claim the audit
-found this project making elsewhere.
+**It no longer exists.** The derivation was produced to answer a question, its findings were
+absorbed, and the code was not kept. So what this project holds is a RECORD that a second
+implementation once agreed, not a second implementation — and the gate as written says "which
+passes the conformance suite", which nothing currently does. The suite has also grown since:
+`visibility/`, the collective-edge cases and `edge-id-does-not-bind-its-body` all postdate it, so
+even a preserved copy would not pass today without changes.
+
+This was recorded as met until someone checked. It is worth noting how it read while it was
+wrong — "**met** — see below" over a paragraph that described a past event in the past tense —
+because that is what a gate looks like when it has quietly decayed rather than been abandoned.
+
+**What it would take.** The conformance runner exists precisely so a third-party implementation
+can be graded without this repository's harness, and the NDJSON protocol is documented in
+`tools/conformance-runner/PROTOCOL.md`. An implementation that answers the Node-level ops and is
+run under it would meet the gate as written.
+
+**What it still would not be:** an independent author. Every implementation this project can
+produce shares the priors of the one that wrote the specification, so the classes of mistake
+nobody thought to look for stay unlooked-for. Meeting the narrowed gate is worth doing; calling it
+"independent implementation" without this paragraph would be the claim the audit found this
+project making elsewhere.
+
+## Gate 5: the discussion-window register
+
+`GOVERNANCE.md` requires a normative change to stay open **14 days** before merge, and a
+constitutional one **30**. That rule was written to stop one author deciding alone, so a register
+of what is inside the window belongs where the gate is, not in a commit message.
+
+| Change | Class | Landed | Window ends |
+|---|---|---|---|
+| §4.1 an unbound `edge_id` is refused | normative | 2026-08-02 | 2026-08-16 |
+| §0 signing-preimage stripping is top-level only | normative | 2026-08-02 | 2026-08-16 |
+| §9.3 two Argon2id profiles, passphrase-generation MUST, required re-wrap path | normative | 2026-08-02 | 2026-08-16 |
+| §5.4 / M-15 an implementation MUST document deletion's reach | normative | 2026-08-02 | 2026-08-16 |
+| §2 the MCP-server requirement for connectors is withdrawn | normative | 2026-08-02 | 2026-08-16 |
+| §4.3 `pending-acceptance` has exactly three exits | editorial-with-vectors | 2026-08-02 | — |
+| §4.7 `expected_unverifiable`, M-8 and M-9 covered | editorial-with-vectors | 2026-08-02 | — |
+| §5.3 visibility matrix, M-4 covered | editorial-with-vectors | 2026-08-02 | — |
+| §9.6 deferred past v1; external review removed as a gate | editorial | 2026-08-02 | — |
+
+None is constitutional: nothing above touches the thirteen README principles. The
+editorial-with-vectors rows carry no window by `GOVERNANCE.md`'s own rule — they add cases for
+behaviour the normative text already required, which is why the class exists.
+
+**The window is time, not work, and it is also not a formality.** Its purpose is that somebody
+else can object, and this project currently has no other implementers to ping. `GOVERNANCE.md`
+says silence from every known implementer BLOCKS a merge rather than permitting it; with an
+implementer set of zero, that clause has nothing to bite on. Recorded here rather than resolved,
+because pretending a window did its job is worse than serving one that could not.
 
 ## Decisions recorded here rather than inferred
 
