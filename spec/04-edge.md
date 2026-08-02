@@ -76,7 +76,7 @@ The edge's current state = the latest valid assertion per the transition table. 
 | pending-acceptance | disputed | either party, `evidence_hash` REQUIRED | cancels the acceptance window |
 | open | released | **owed_to alone** | unilateral forgiveness |
 | open | superseded | owner + owed_to (both assert) | successor edge referenced via `supersedes` on the new edge |
-| open | expired | either party after `due` | only if `due` non-null; MUST NOT auto-escalate if edge unverifiable |
+| open | expired | either party after `due` | only if `due` non-null; **and not dated beyond the verifying node's own clock** (§4.4); MUST NOT auto-escalate if edge unverifiable |
 | open | disputed | either party, `evidence_hash` REQUIRED | resolution semantics: §4.4 |
 | disputed | superseded/closed | both parties | agreement |
 | disputed | expired | either party, only once `dispute_window` has elapsed | **not a verdict** — §4.4 |
@@ -97,6 +97,15 @@ Any assertion violating this table is **invalid** and MUST be discarded by confo
 **`asserted_at` MUST be non-decreasing per signer within a chain.** A node MUST discard an assertion whose `asserted_at` is earlier than the `asserted_at` of the most recent accepted assertion by that same signer.
 
 The reason is that both windows in this specification — `acceptance_window` here and `dispute_window` in §4.4 — are measured between two `asserted_at` values, and until v0.2 both of those values could be written by the party the window constrains. An owner could mint `closed` dated years in the past and `closed` dated now, one second apart, and a node would compute the window as elapsed on an edge the counterparty had only ever confirmed. The contrast that identifies the flaw is `expired` from a due date: `due` sits on the edge object that both parties signed, cannot be moved unilaterally, and so the check on it means something.
+
+**`expired` needs a bound on its own side too, and the contrast this specification drew was false.**
+The paragraph below argues that `expired` is the sound case because `due` sits on the edge object both parties signed and cannot be moved unilaterally. That is true of `due` and says nothing about *now*. A counterparty who confirms an edge due in two years can immediately sign `expired` dated two years ahead: `asserted_at >= due` is satisfied, the per-signer monotonic rule has nothing earlier by that signer to compare against, and `expired` is terminal — so the owner can never act on their own commitment again, on one signature, at any moment of the edge's life.
+
+A node therefore MUST discard an `expired` assertion whose `asserted_at` is further into its own future than honest clock disagreement allows. This specification does not fix that tolerance, because the machines are not this document's to configure; the reference implementation uses one day, which no pair of hosts carrying UTC offsets disagrees by, and which turns "two years early" into "one day early".
+
+This reverses, for this one transition, the permission the paragraph below grants — and the reversal is narrow on purpose. The reasoning that made it a MAY holds for the acceptance and dispute windows: those are measured between two `asserted_at` values, both parties act, and a node refusing a peer's future-dated assertion would be refusing an honest one. `expired` is different in every respect that matters: **terminal**, **unilateral**, and gated on a self-written claim about the present rather than on anything the other party signed.
+
+**No vector can carry this.** It depends on the verifying node's clock, and vector generation and the conformance runner are clockless by construction so that a replay reaches the same verdict on every machine forever. It is a prose obligation in the sense §8 defines, entered knowingly rather than discovered later. A node's READ of a stored chain MUST remain clockless for the same reason: what the clock decides is what a node will store, and a stored chain must always replay to the same state.
 
 **What this rule buys, and what it does not.** It closes the observed attack, which needs two assertions by one signer with the later one backdated. It does NOT stop a party backdating its *first* assertion in a chain, because there is nothing earlier by that signer to compare against and this protocol has no trusted clock. **A window between two self-asserted instants is therefore evidence about a cooperating counterparty and MUST NOT be relied on against a hostile one.** A node MAY additionally refuse an assertion dated in its own future; that is local policy, not conformance, because two honest nodes disagree about *now* and the protocol has no way to say which is right.
 
