@@ -14,7 +14,7 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 |---|---|---|
 | 1 | Every §8 MUST is accounted for, in a category that says what it is | **met** — four categories, listed below ([#42](../../issues/42)) |
 | 2 | A second implementation, written from the specification and vectors alone | **met** — `servanda-py`, Node PASS 176/176, claim granted |
-| 3 | No known divergence between the specification and the reference implementation | **met** — §2's connector-transport requirement was withdrawn |
+| 3 | No known divergence between the specification and the reference implementation | **NOT met** — §1.7 rotation is unimplemented |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
 | 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open until **2026-08-16** — see the register below |
 
@@ -55,6 +55,32 @@ which is how §8 came to claim two vector families that had never existed.
 **The four §9.6 items** — threshold group signing, formal verification of the transition table,
 anonymous credentials for cross-org level-3, post-quantum suites. §9.6 records why each is
 deferred rather than treating them as one bundle.
+
+## Gate 3: §1.7 rotation is prose
+
+The gate read "met" on the strength of one divergence being closed (§2's connector transport).
+It is a universal negative and one example does not support it — which S8 said at the time, and
+which S5 then demonstrated by finding another.
+
+**§1.7's central MUST is unimplemented.** *"The signature by `old` is what transfers continuity:
+verifiers MUST treat `new` as the successor for all open edges of `old`."* In the reference
+implementation:
+
+- `resolveSuccessor` exists, is correct, and has **no production caller** — only tests.
+- `Vault` has **no rotation record type at all**, so a counterparty holding a valid rotation
+  statement has nowhere to put it.
+- Consequently: a rotated key on its own open edge is refused `signer-not-a-party`, and over the
+  wire the counterparty's inbox discards it `sender-is-not-a-party`.
+
+What makes this worth naming rather than filing quietly is what it costs. §1.7 lists rotation as
+one of two seedless recovery paths, and ADR-0014's whole argument is that a persona survives the
+loss of a device. It does not: the story S5 ran only continued because the persona still held the
+seed — that is, because the rotation was unnecessary. **The recovery path that exists for the case
+where you have lost everything works only when you have lost nothing.**
+
+Not fixed here. It is a feature, not a patch — a vault record type, an ingestion path, and a
+transition table that accepts a successor key — and doing it badly under time pressure is how a
+key-continuity mechanism becomes an account-takeover vector. Recorded as the gate it blocks.
 
 ## Gate 2, and what "independent" was narrowed to mean
 
