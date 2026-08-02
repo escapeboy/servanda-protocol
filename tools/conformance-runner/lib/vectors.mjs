@@ -81,12 +81,17 @@ const ADAPTERS = {
   signatures: (doc) => doc.cases.map((c) => ({
     name: c.name,
     op: 'signing_preimage',
-    input: { signed_object: c.signed_object },
-    pins: [pin('canonical', c.canonical), pin('sha256_preimage', c.sha256_preimage)],
-    // No verdict is asked for: the file pins `signature` and `signer.persona_id` but
-    // states no expectation about verifying them, and the runner does not invent one.
-    // See README.md findings/3.
-    unverified: ['no verification verdict is pinned by this family (README.md findings/3)'],
+    input: { signed_object: c.signed_object, signer: c.signer.persona_id },
+    pins: [
+      pin('canonical', c.canonical),
+      pin('sha256_preimage', c.sha256_preimage),
+      // v0.2: the family pins a verdict, so the runner asks for one. It did not before, and
+      // said so rather than inventing it — the family carried five positives and no expectation,
+      // which a `return true` verifier passed in full. `reason` is pinned too, because
+      // "rejected everything" and "rejected the right thing" are different implementations.
+      pin('verifies', c.verifies),
+      pin('reason', c.reason),
+    ],
   })),
 
   hashing: (doc) => doc.cases.map((c) => ({

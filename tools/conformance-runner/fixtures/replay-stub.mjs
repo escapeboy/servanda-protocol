@@ -33,6 +33,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // Each entry corrupts a replayed answer the way a plausible implementation bug would.
 // The comment on each names the MUST it breaks — that is what the runner should report.
 const MUTATIONS = {
+  // The `return true` verifier, in one line. Until v0.2 the signatures family pinned no verdict
+  // at all, so this fault had nothing to corrupt and an implementation that never rejected a
+  // signature conformed. It is first in the list because it is the one the suite could not catch.
+  'signatures#signed-by-a-different-key': (r) => ({ ...r, verifies: true, reason: null }),
   // M-14: escaping the solidus is the classic JSON-escaping-by-habit bug. It changes the
   // canonical form and therefore every hash taken over it.
   'canonicalization#string-escapes-solidus': (r) => {

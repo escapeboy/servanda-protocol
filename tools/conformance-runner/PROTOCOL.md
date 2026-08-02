@@ -107,7 +107,7 @@ of its own.
 | `clip_to_octets` | `{value, limit_octets}` | `{clipped}` |
 | `bip39_seed` | `{mnemonic, passphrase}` | `{seed}` |
 | `derive_key` | `{mnemonic, passphrase, path}` | `{path, chain_code, private_key, public_key, persona_id}` |
-| `signing_preimage` | `{signed_object}` | `{canonical, sha256_preimage}` |
+| `signing_preimage` | `{signed_object, signer}` | `{canonical, sha256_preimage, verifies, reason}` |
 | `verify_transitions` | `{edge, assertions}` | `{outcomes, final_state}` |
 | `verify_inbox_record` | `{record, known_keys}` | `{canonical, accepted, rejection_reason, actual_signer}` |
 | `oob_bootstrap` | `{message}` | `{canonical, payload_b64url, url, signature_verifies}` |
@@ -126,10 +126,14 @@ Notes on the shapes, where the shape encodes a rule:
   `bounds.json` pins `measured` in that bound's own unit as well as the verdict. Returning
   the right verdict from the wrong measurement is a bug the vector can see, so the protocol
   asks for both.
-- **`signing_preimage`** asks only for the preimage, not a verdict. `signatures.json` pins
-  `canonical` and `sha256_preimage` but states no expectation about verification, and the
-  runner will not invent one. Signature verification with both polarities is covered by
-  `addressing/` (`inbox-records.json`, `oob-bootstrap.json`), which do pin verdicts.
+- **`signing_preimage`** asks for the preimage AND the verdict. `signer` is the persona_id the
+  object claims; `verifies` is whether the signature checks out against it, and `reason` is
+  `null` when it does. Until v0.2 this op asked for the preimage alone, because the family pinned
+  no expectation — five positive cases and nothing to fail, which a `return true` verifier passed
+  in full. The reasons are `signature-does-not-verify`, `signature-does-not-cover-this-object`
+  and `signature-by-another-key`; an implementation that refuses everything fails on the
+  positives, and one that refuses for the wrong reason fails on `reason`.
+
 - **`advertise_actions`** and **`act`** receive `window_elapsed` as input. Generation is
   clockless and so is the runner: an IUT that reads a clock here is answering a different
   question than the one asked.

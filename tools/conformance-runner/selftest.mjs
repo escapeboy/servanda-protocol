@@ -50,6 +50,9 @@ const JCS = ['--', 'node', resolve(HERE, 'fixtures/jcs-node-stub.mjs')];
 // 2. The faults fire, and ONLY the faults fire.
 {
   const EXPECTED = [
+    // v0.2: ninth fault. The signatures family pinned no verdict until now, so a `return true`
+    // verifier had nothing to fail — this entry is the one the suite previously could not catch.
+    'signatures#signed-by-a-different-key',
     'canonicalization#string-escapes-solidus',
     'transitions-invalid#owner-self-confirms',
     'node-surface-actions#open-owner',
@@ -68,7 +71,8 @@ const JCS = ['--', 'node', resolve(HERE, 'fixtures/jcs-node-stub.mjs')];
   check('faults: both claims refused', report.claims.every((c) => !c.granted));
 
   const byId = Object.fromEntries(report.levels.map((l) => [l.id, l]));
-  check('faults: node fails on its five', setEq(byId.node.failed, [
+  check('faults: node fails on its six', setEq(byId.node.failed, [
+    'signatures#signed-by-a-different-key',
     'canonicalization#string-escapes-solidus',
     'transitions-invalid#owner-self-confirms',
     'node-surface-actions#open-owner',

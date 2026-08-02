@@ -160,17 +160,32 @@ console.log('4. Signature vectors');
       `sig/${c.name}: canonical form`,
     );
     check(digestHex(c.unsigned_object) === c.sha256_preimage, `sig/${c.name}: preimage digest`);
+    // The verdict the case pins, checked in both directions rather than assumed positive.
+    const verified = verifyObject(c.signed_object, c.signature, fromHex(c.signer.persona_id));
+    check(verified === c.verifies, `sig/${c.name}: verifies=${c.verifies}`);
     check(
-      verifyObject(c.signed_object, c.signature, fromHex(c.signer.persona_id)),
-      `sig/${c.name}: signature verifies against signer key`,
+      (c.reason === null) === c.verifies,
+      `sig/${c.name}: a refusal names a reason and an acceptance names none`,
     );
-    // Negative control: a one-nibble mutation must not verify.
-    const bad = (c.signature[0] === '0' ? '1' : '0') + c.signature.slice(1);
-    check(
-      !verifyObject(c.signed_object, bad, fromHex(c.signer.persona_id)),
-      `sig/${c.name}: corrupted signature is rejected`,
-    );
+
+    if (c.verifies) {
+      // Negative control on a positive case: a one-nibble mutation must not verify.
+      const bad = (c.signature[0] === '0' ? '1' : '0') + c.signature.slice(1);
+      check(
+        !verifyObject(c.signed_object, bad, fromHex(c.signer.persona_id)),
+        `sig/${c.name}: corrupted signature is rejected`,
+      );
+    }
   }
+
+  // The family must contain BOTH kinds. It carried five positives and no verdict until v0.2,
+  // which a `return true` verifier passed in full — the defect this assertion exists to prevent
+  // from returning quietly.
+  check(v.cases.some((c: any) => c.verifies), 'sig: the family has a positive case');
+  check(v.cases.some((c: any) => !c.verifies), 'sig: the family has a NEGATIVE case');
+  // …and the negatives must not all be the same shape, or one bug hides behind another.
+  const reasons = new Set(v.cases.filter((c: any) => !c.verifies).map((c: any) => c.reason));
+  check(reasons.size >= 3, 'sig: the negatives fail for at least three distinct reasons');
 }
 
 // ---------------------------------------------------------------------------

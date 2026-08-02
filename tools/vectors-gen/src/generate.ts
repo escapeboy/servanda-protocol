@@ -278,8 +278,43 @@ export function buildSignatures() {
       sha256_preimage: digestHex(unsigned as Json),
       signature: sig,
       signed_object: { ...unsigned, sig } as Json,
+      verifies: true,
+      reason: null as string | null,
     };
   };
+
+  /**
+   * A case the verifier must REFUSE, and the reason it must refuse it for.
+   *
+   * The family had five cases, all valid, and pinned no verdict at all — so an implementation
+   * whose `verify` was `return true` passed every one of them. That is a check that cannot fail,
+   * over the single most load-bearing operation in the protocol: M-2 (an edge exists only when
+   * both have signed), M-14 (an invalid assertion is discarded) and §6.2 (a message whose
+   * signature does not verify is discarded) all rest on this primitive rejecting something.
+   *
+   * `reason` is pinned as well as the verdict, because "refused everything" and "refused the
+   * right thing" are different implementations and only one of them conforms. A family of
+   * only-negatives has the mirror defect.
+   */
+  const refuse = (
+    name: string,
+    description: string,
+    reason: string,
+    unsigned: Record<string, Json>,
+    signature: string,
+    signerId: string,
+  ) => ({
+    name,
+    description,
+    signer: { persona_id: signerId, derivation_path: null as string | null },
+    unsigned_object: unsigned as Json,
+    canonical: canonicalize(unsigned as Json),
+    sha256_preimage: digestHex(unsigned as Json),
+    signature,
+    signed_object: { ...unsigned, sig: signature } as Json,
+    verifies: false,
+    reason,
+  });
 
   const edge = {
     commitment_hash: commitmentHash(baseCommitment),
@@ -297,11 +332,68 @@ export function buildSignatures() {
     evidence_hash,
   });
 
+  // Built once so the negatives can borrow real signatures rather than invented ones: a
+  // negative that carries a syntactically impossible signature tests the hex parser, not the
+  // verifier.
+  const honest = assertion('proposed', '2026-07-25T09:00:00Z', ALICE.personaId, null);
+  const honestSig = signObject(honest, ALICE.privateKey);
+  const other = assertion('proposed', '2026-07-25T09:00:01Z', ALICE.personaId, null);
+  const flipped = (() => {
+    const first = parseInt(honestSig.slice(0, 2), 16) ^ 0x01;
+    return first.toString(16).padStart(2, '0') + honestSig.slice(2);
+  })();
+
+  const negatives = [
+    refuse(
+      'signature-over-a-different-object',
+      'The signature is genuine and belongs to another message by the same signer. This is the ' +
+        'attack the preimage rule exists for: a verifier that checks only "is this a valid ' +
+        'Ed25519 signature by this key" accepts it.',
+      'signature-does-not-cover-this-object',
+      other,
+      honestSig,
+      ALICE.personaId,
+    ),
+    refuse(
+      'signed-by-a-different-key',
+      'A real signature over exactly this object, by somebody who is not the signer it names. ' +
+        'M-1 and M-2 both reduce to catching this.',
+      'signature-by-another-key',
+      honest,
+      signObject(honest, CAROL.privateKey),
+      ALICE.personaId,
+    ),
+    refuse(
+      'one-flipped-bit',
+      'The same signature with its first octet XORed by 1. XOR rather than a written constant: ' +
+        'a constant is sometimes already the value, and a tamper that tampers with nothing is a ' +
+        'case that passes for the wrong reason — this suite has shipped exactly that before.',
+      'signature-does-not-verify',
+      honest,
+      flipped,
+      ALICE.personaId,
+    ),
+    refuse(
+      'object-altered-after-signing',
+      '§0: the preimage is the object minus `sig`, so altering ANY other member invalidates the ' +
+        'signature. Here `asserted_at` moved by one second — the change a party would make to ' +
+        'walk a window, which §4.3’s monotonicity rule also guards from the other side.',
+      'signature-does-not-cover-this-object',
+      { ...honest, asserted_at: '2026-07-25T09:00:01Z' },
+      honestSig,
+      ALICE.personaId,
+    ),
+  ];
+
   return {
     ...banner('spec/00-overview.md (Conventions), §1.3, §1.7, §4.2'),
     description:
       'Ed25519 over sha256(JCS(object without its `sig` field)). Verify by recomputing ' +
-      '`sha256_preimage` from `unsigned_object` and checking `signature` against the signer key.',
+      '`sha256_preimage` from `unsigned_object` and checking `signature` against the signer key. ' +
+      'Every case pins `verifies`, and a refused one pins `reason` as well: an implementation that ' +
+      'rejects everything is not the same as one that rejects the right thing, and only one of them ' +
+      'conforms. The family carried five positives and no verdict until v0.2 — a `return true` ' +
+      'verifier passed all five.',
     signing_rule: 'ed25519_sign(sha256(JCS(object minus "sig")), private_key)',
     cases: [
       sign(
@@ -354,6 +446,7 @@ export function buildSignatures() {
         },
         ALICE,
       ),
+      ...negatives,
     ],
   };
 }
