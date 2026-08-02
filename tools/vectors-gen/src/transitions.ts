@@ -53,6 +53,7 @@ export type EffectiveState =
   | 'proposed'
   | 'open'
   | 'pending-acceptance'
+  | 'contested-closure'
   | 'disputed'
   | 'closed'
   | 'released'
@@ -86,6 +87,12 @@ interface MutableState {
   supersededBy: Set<string>;
   /** Parties that have asserted `closed` out of `disputed` (§4.3 requires both). */
   disputedClosedBy: Set<string>;
+  /** §4.4: the unilateral exit from `open`, so a concurrent DIFFERENT one can be recognised. */
+  exit: { state: string; by: string; at: string } | null;
+  /** Set by `evaluate`, consumed by `apply`: this assertion contests rather than transitions. */
+  contestPending: boolean;
+  contestClosedBy: Set<string>;
+  contestSupersededBy: Set<string>;
   /** asserted_at of the accepted `disputed` assertion — when `dispute_window` starts running. */
   disputedAt: string | null;
   /**
@@ -119,12 +126,40 @@ export function addDuration(isoTimestamp: string, duration: string): number {
   return base + ((days * 24 + hours) * 60 + minutes) * 60_000;
 }
 
+/** §4.4: the exits `open` gives one party acting alone. `superseded` needs both, so it cannot race. */
+const UNILATERAL_EXITS: readonly string[] = ['closed', 'released', 'expired'] as const;
+
+/**
+ * Would this have been a legal unilateral exit from `open`? Null if yes, else why not.
+ * A counterfactual, because the chain has already left `open` — only a legal act contests.
+ */
+function unilateralExitFault(edge: Edge, a: Assertion): RejectionReason | null {
+  const isOwner = a.by === edge.owner;
+  const isOwedTo = a.by === edge.owed_to;
+  switch (a.state) {
+    case 'closed':
+      if (!isOwner) return 'wrong-signer-for-transition';
+      return a.evidence_hash === null ? 'evidence-hash-required-for-owner-closure' : null;
+    case 'released':
+      return isOwedTo ? null : 'wrong-signer-for-transition';
+    case 'expired':
+      if (edge.due === null) return 'due-is-null';
+      return Date.parse(a.asserted_at) < Date.parse(edge.due) ? 'expiry-before-due' : null;
+    default:
+      return 'illegal-source-state';
+  }
+}
+
 export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
   const st: MutableState = {
     state: 'none',
     acceptanceWindowOpenedAt: null,
     supersededBy: new Set(),
     disputedClosedBy: new Set(),
+    exit: null,
+    contestPending: false,
+    contestClosedBy: new Set(),
+    contestSupersededBy: new Set(),
     disputedAt: null,
     latestBySigner: new Map(),
   };
@@ -197,7 +232,46 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
   const isOwedTo = a.by === edge.owed_to;
   if (!isOwner && !isOwedTo) return 'signer-not-a-party';
 
+  // §4.4: two parties took DIFFERENT unilateral exits from `open` concurrently, and neither did
+  // anything wrong. Refusing the second is what left two honest nodes permanently divergent, so it
+  // is checked before the terminal guard. Only a concurrent act contests — one dated later could
+  // have been a response, and §4.3's rows already say what an answer to an exit is.
+  if (
+    st.exit !== null &&
+    a.by !== st.exit.by &&
+    UNILATERAL_EXITS.includes(a.state) &&
+    a.state !== st.exit.state &&
+    st.state !== 'contested-closure' &&
+    Date.parse(a.asserted_at) <= Date.parse(st.exit.at)
+  ) {
+    const fault = unilateralExitFault(edge, a);
+    if (fault !== null) return fault;
+    // `evaluate` decides; `apply` moves the state. Setting it here would be overwritten by the
+    // ordinary row a moment later — which is exactly what happened the first time.
+    st.contestPending = true;
+    return null;
+  }
+
   if (TERMINAL.includes(st.state)) return 'terminal-state-reached';
+
+  // §4.3: `contested-closure` is left the way `disputed` is — both parties, or not at all.
+  if (st.state === 'contested-closure') {
+    const both = (seen: Set<string>): RejectionReason | null =>
+      seen.has(a.by) ? 'duplicate-assertion-by-same-party' : (seen.add(a.by), null);
+    if (a.state === 'closed') {
+      const bad = both(st.contestClosedBy);
+      if (bad) return bad;
+      if (st.contestClosedBy.size === 2) st.state = 'closed';
+      return null;
+    }
+    if (a.state === 'superseded') {
+      const bad = both(st.contestSupersededBy);
+      if (bad) return bad;
+      if (st.contestSupersededBy.size === 2) st.state = 'superseded';
+      return null;
+    }
+    return 'illegal-source-state';
+  }
 
   switch (a.state) {
     case 'proposed':
@@ -315,6 +389,16 @@ function evaluateClosure(
 }
 
 function apply(edge: Edge, a: Assertion, st: MutableState): void {
+  if (st.contestPending) {
+    st.contestPending = false;
+    st.state = 'contested-closure';
+    return;
+  }
+  // Leaving `contested-closure` is decided in `evaluate` (both parties, exactly as `disputed`),
+  // so the ordinary rows must not run over it.
+  if (st.state === 'contested-closure' && st.contestClosedBy.size < 2 && st.contestSupersededBy.size < 2) {
+    return;
+  }
   switch (a.state) {
     case 'proposed':
       st.state = 'proposed';
@@ -325,10 +409,12 @@ function apply(edge: Edge, a: Assertion, st: MutableState): void {
       return;
 
     case 'released':
+      if (st.state === 'open') st.exit = { state: 'released', by: a.by, at: a.asserted_at };
       st.state = 'released';
       return;
 
     case 'expired':
+      if (st.state === 'open') st.exit = { state: 'expired', by: a.by, at: a.asserted_at };
       st.state = 'expired';
       return;
 
@@ -357,6 +443,7 @@ function apply(edge: Edge, a: Assertion, st: MutableState): void {
         }
         return;
       }
+      if (st.state === 'open') st.exit = { state: 'closed', by: a.by, at: a.asserted_at };
       if (edge.closure_policy === 'on-evidence') {
         st.state = 'closed';
         return;

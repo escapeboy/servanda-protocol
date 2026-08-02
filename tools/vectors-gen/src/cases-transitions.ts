@@ -432,6 +432,62 @@ export const VALID_CASES: TransitionCase[] = [
     expectedFinalState: 'proposed',
     expectedUnverifiable: false,
   },
+  {
+    name: 'concurrent-close-and-release-is-contested',
+    description:
+      '§4.4: `open` gives three exits to one party acting alone, and they are mutually exclusive. ' +
+      'Here the owner closes with evidence and the counterparty releases at the same instant, ' +
+      'neither having seen the other. **Both acts are legal and both stand.** Refusing the second ' +
+      'is what left two honest nodes permanently divergent across a partition: each accepted its ' +
+      'own party’s act, discarded the other’s, and §6.4 never reached "nothing to send". The ' +
+      'state is computed, carried in no assertion, and is NOT terminal — it is left the way ' +
+      '`disputed` is left, by both parties together.',
+    edge: EDGE_EVIDENCE,
+    assertions: [
+      proposed(EDGE_EVIDENCE),
+      confirmed(EDGE_EVIDENCE),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_EVIDENCE, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'released', asserted_at: T_EVIDENCE, signer: BOB }),
+    ],
+    expected: [null, null, null, null],
+    expectedFinalState: 'contested-closure',
+  },
+  {
+    name: 'concurrent-release-and-close-is-the-same-contest',
+    description:
+      'The same two assertions in the opposite order. **This is the property the state exists ' +
+      'for**: two nodes see the pair in whichever order their transports delivered it, and if ' +
+      'that changed the answer, naming the state would fix nothing and §6.4 would still never ' +
+      'converge. A verifier that reaches a different final state here than in the case above ' +
+      'has not implemented this rule, whatever it computes for either one alone.',
+    edge: EDGE_EVIDENCE,
+    assertions: [
+      proposed(EDGE_EVIDENCE),
+      confirmed(EDGE_EVIDENCE),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'released', asserted_at: T_EVIDENCE, signer: BOB }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_EVIDENCE, signer: ALICE, evidence_hash: EV }),
+    ],
+    expected: [null, null, null, null],
+    expectedFinalState: 'contested-closure',
+  },
+  {
+    name: 'contested-closure-left-by-both-parties',
+    description:
+      '§4.4: `contested-closure` is not terminal. Both parties assert `closed` and the edge ' +
+      'closes — the same mutual exit `disputed` has. A state two people can enter by accident ' +
+      'and cannot leave together would be a worse trap than the divergence it replaces.',
+    edge: EDGE_EVIDENCE,
+    assertions: [
+      proposed(EDGE_EVIDENCE),
+      confirmed(EDGE_EVIDENCE),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_EVIDENCE, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'released', asserted_at: T_EVIDENCE, signer: BOB }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_ACCEPT, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_AFTER_WINDOW, signer: BOB }),
+    ],
+    expected: [null, null, null, null, null, null],
+    expectedFinalState: 'closed',
+  },
 ];
 
 export const INVALID_CASES: TransitionCase[] = [
@@ -472,6 +528,46 @@ export const INVALID_CASES: TransitionCase[] = [
     expected: [null, 'illegal-source-state'],
     expectedFinalState: 'proposed',
     expectedUnverifiable: true,
+  },
+  {
+    name: 'a-later-release-does-not-contest-it-answers',
+    description:
+      '§4.4: **only a concurrent act contests.** This `released` is dated AFTER the owner’s ' +
+      'evidence assertion, so it could have been a response to it — and §4.3 already says what ' +
+      'the answers to an evidence assertion are: accept it, or dispute it. Reaching ' +
+      '`contested-closure` here would let a party who waited claim the position of one who did ' +
+      'not, and would reverse the `pending-acceptance` restriction the table states. The ' +
+      'comparison is between two self-written timestamps, which is sound only because backdating ' +
+      'buys nothing: `disputed` is legal from `pending-acceptance` and blocks the closure just as ' +
+      'firmly, with an `evidence_hash` attached.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({ edge_id: EDGE_ACCEPTANCE.edge_id, state: 'closed', asserted_at: T_EVIDENCE, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_ACCEPTANCE.edge_id, state: 'released', asserted_at: T_ACCEPT, signer: BOB }),
+    ],
+    expected: [null, null, null, 'illegal-source-state'],
+    expectedFinalState: 'pending-acceptance',
+  },
+  {
+    name: 'an-illegal-concurrent-exit-is-refused-for-its-own-fault',
+    description:
+      '§4.4: only a LEGAL act contests. `expired` before `due` was never available to either ' +
+      'party, so it is refused for the reason it deserves rather than laundered into a state ' +
+      'that needs both parties to leave. An illegal act is not half of a disagreement.',
+    edge: EDGE_EVIDENCE,
+    assertions: [
+      proposed(EDGE_EVIDENCE),
+      confirmed(EDGE_EVIDENCE),
+      // Both dated at the same instant, and BEFORE `due`. Same instant so that §6.4's
+      // `asserted_at` normalisation cannot reorder them — a case whose meaning depends on the
+      // order it is written in would say something different when replayed over a wire.
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_BEFORE_DUE, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'expired', asserted_at: T_BEFORE_DUE, signer: BOB }),
+    ],
+    expected: [null, null, null, 'expiry-before-due'],
+    expectedFinalState: 'closed',
   },
   {
     name: 'edge-id-does-not-bind-its-body',

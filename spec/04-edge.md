@@ -80,6 +80,9 @@ The edge's current state = the latest valid assertion per the transition table. 
 | open | disputed | either party, `evidence_hash` REQUIRED | resolution semantics: §4.4 |
 | disputed | superseded/closed | both parties | agreement |
 | disputed | expired | either party, only once `dispute_window` has elapsed | **not a verdict** — §4.4 |
+| open | contested-closure | — (computed; no signer) | two parties took **different** unilateral exits concurrently — §4.6 |
+| contested-closure | closed | owner + owed_to (both assert) | agreement, exactly as from `disputed` |
+| contested-closure | superseded | owner + owed_to (both assert) | agreement |
 
 Any assertion violating this table is **invalid** and MUST be discarded by conforming nodes (this is how constitutional rules bind rude clients).
 
@@ -88,6 +91,8 @@ Any assertion violating this table is **invalid** and MUST be discarded by confo
 **`pending-acceptance` is a state a node computes**; it is never a value carried in an assertion's `state` member. An `on-acceptance` edge enters it when the owner's evidence assertion is accepted, and the node MUST record the `asserted_at` of that assertion as the instant from which `acceptance_window` runs. A `closed` assertion by the owner from `pending-acceptance` MUST be discarded unless `asserted_at` is greater than or equal to that instant plus `acceptance_window`. Once a `disputed` assertion is accepted the acceptance window is cancelled; the edge MUST NOT re-enter `pending-acceptance`, and the only exits are those the `disputed` rows provide. A node MUST NOT infer act 1 from act 3 or vice versa by inspecting the assertion alone: which act a `closed` assertion by the owner performs is determined by the state the chain was in when it arrived.
 
 **The three `pending-acceptance` rows above are all of them.** `released`, `expired` and `superseded` are `open` rows and have no `pending-acceptance` counterpart, so an assertion carrying one of those states from `pending-acceptance` violates this table and MUST be discarded under M-14. This is spelled out because the equivalence the paragraph above grants — `confirmed` ≡ `open` — reads naturally as a general "open family", and two implementations written independently both extended it to `pending-acceptance` and grew the three rows. The one that does damage is `expired`: it is terminal, and either party may sign it once `due` has passed, so from `pending-acceptance` the counterparty could answer the owner's evidence assertion by ending the edge outright — no closure, no dispute to answer, nothing further assertable. That is §4.4 inverted, since the acceptance window exists so that the counterparty's SILENCE becomes consent, and it made a veto cheaper than a dispute, which at least carries an `evidence_hash` and leaves both resolutions open.
+
+**`contested-closure` is a state a node computes**, never a value carried in an assertion's `state` member. It is defined in §4.4 below, under closure, because that is where the exits it reconciles are defined.
 
 **`asserted_at` MUST be non-decreasing per signer within a chain.** A node MUST discard an assertion whose `asserted_at` is earlier than the `asserted_at` of the most recent accepted assertion by that same signer.
 
@@ -110,6 +115,18 @@ A third exit ends the edge without resolving it. Once `dispute_window` has elaps
 Without this exit, both resolutions require BOTH parties, so disputing is a unilateral act that freezes an edge permanently. A counterparty who disputes and then goes silent leaves an owner who may have genuinely fulfilled the commitment holding an edge that can never close, never expire and never be superseded. Ending a dead edge is a different act from ruling on it, and the protocol should not be usable to manufacture a permanent stalemate.
 
 `dispute_window` is a protocol constant of **P30D**, not an edge member: it is nobody's to choose. A per-edge value would let one party pick the window that suits them, and the party who benefits from a long freeze is precisely the party who disputes.
+
+**Two parties may exit `open` at the same instant, and both acts stand.** `open` offers three exits a single party may take alone — `closed` by the owner with evidence, `released` by `owed_to`, `expired` by either once `due` has passed — and they are mutually exclusive. Nothing prevents two parties taking *different* ones before either has seen the other's, and neither party did anything wrong. A node that holds both MUST compute the state as **`contested-closure`**.
+
+Three properties make this the resolution rather than one of the alternatives, and all three are requirements:
+
+1. **It converges.** Both nodes compute it from the same set of assertions, in either order. Without that, §6.4's guarantee fails outright: each node accepts its own party's act, discards the other's, and reconciliation never reaches "nothing to send" — every round re-offering a chain the other end re-discards, for the life of the edge. This is not a hostile case; it is what two honest nodes do across a partition.
+2. **Nothing signed is discarded.** A deterministic tie-break — lowest hash, earliest timestamp — also converges, and does so by voiding one party's signed act in a protocol whose whole premise is that a signed act stands. It would also decide by `asserted_at`, a value written by the party it judges.
+3. **It is unverifiable in the sense of M-8**, and a node MUST NOT auto-escalate on it. The edge is not resolved; two people disagree about how it ended, and the protocol's job here is to make that visible rather than to pick a winner — the same position §4.4 takes on disputes and §4.1 takes on divergent edge bodies.
+
+`contested-closure` is NOT terminal. It is left the way `disputed` is left: both parties assert `closed`, or both assert `superseded`. A state two people can enter by accident and cannot leave together would be a worse trap than the divergence it replaces.
+
+**Only a concurrent act contests.** An assertion whose `asserted_at` is LATER than the exit it conflicts with MUST NOT produce `contested-closure`; it is judged by the ordinary rows, which is to say discarded. An act dated after the one it conflicts with could have been a response to it, and §4.3 already says what the answers to an exit are — accept it, or dispute it. This comparison is between two self-written timestamps, which §4.3 otherwise distrusts, and it is sound here for a specific reason: backdating buys nothing. A counterparty who wants to stop a closure already has `disputed`, legal from `pending-acceptance`, with the same blocking effect and an `evidence_hash` attached. No position is reachable by lying that is not reachable honestly.
 
 ## 4.5 Supersession (ADR-0010)
 

@@ -134,6 +134,12 @@ export function actionsFor(
       // mutual supersession, and neither is a single-call act, so only `supersede` is shown.
       return [advertise('supersede')];
 
+    case 'contested-closure':
+      // §4.4: the same shape as `disputed`, and for the same reason. Both exits need both
+      // parties, so no single call performs one, and M-20 forbids advertising an act this
+      // persona cannot sign into effect on its own.
+      return [advertise('supersede')];
+
     // Terminal states carry no affordances at all (§7 conformance notes).
     case 'closed':
     case 'released':

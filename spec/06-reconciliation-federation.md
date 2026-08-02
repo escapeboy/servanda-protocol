@@ -42,6 +42,12 @@ Periodic pairwise sync between nodes sharing edges:
 - `recon_request`: `{ edges: [ {edge_id, latest_assertion_hash} ] }` for all shared open edges.
 - `recon_response`: missing assertions for divergent chains.
 - Divergence in *state* is resolved by the transition table — assertions invalid per §4.3 are discarded; the valid chain wins. Divergence in *content* cannot occur post-confirmation (content is the hash; changes require supersession).
+
+**`latest_assertion_hash` is a digest over the SET of assertions held, and MUST NOT depend on their order.** Take each assertion's `sig`, sort the resulting strings, and hash the canonical form of that list. This was previously undefined here, and the reading an implementation naturally reaches for — the hash of the *last* assertion held — does not converge: two honest nodes that each signed their own act and then received the other's hold identical sets in opposite orders, report different hashes forever, and re-exchange a chain each already has on every round. The field answers "do we hold the same assertions?", which is a question about a set; the last element of a sequence answers a different question.
+
+Order is not thereby unimportant — it is what the transition table consumes, and two nodes holding the same set can still compute different states. That is a separate guarantee, kept by normalising each batch before applying it (below) and by §4.3 naming `contested-closure` for the case where two legal acts genuinely conflict.
+
+**"the valid chain wins" assumes exactly one exists.** Where two do — two parties took different unilateral exits from `open` concurrently, each valid — neither may be discarded, and §4.4's `contested-closure` is the state both nodes MUST compute. Without it this bullet has no answer and reconciliation does not terminate; with it, both ends converge on the same chain and the same state, which is what this section promises.
 - Escalation on drift (owner forgot) is a local decision of the owner's node upon seeing its own overdue open edge — reconciliation only guarantees both sides see the same chain.
 
 ## 6.5 Anti-spam / proposal budget
