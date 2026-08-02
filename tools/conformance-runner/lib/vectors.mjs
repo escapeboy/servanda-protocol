@@ -81,7 +81,7 @@ const ADAPTERS = {
   signatures: (doc) => doc.cases.map((c) => ({
     name: c.name,
     op: 'signing_preimage',
-    input: { signed_object: c.signed_object, signer: c.signer.persona_id },
+    input: { signed_object: c.signed_object, signer: c.signer.persona_id, known_keys: doc.known_keys },
     pins: [
       pin('canonical', c.canonical),
       pin('sha256_preimage', c.sha256_preimage),

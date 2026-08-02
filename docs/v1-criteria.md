@@ -13,7 +13,7 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 | # | Gate | State |
 |---|---|---|
 | 1 | Every §8 MUST is either covered by a vector or **counted** as a prose obligation, with no third category | **met** — five prose obligations, each with its reason ([#42](../../issues/42)) |
-| 2 | A second implementation, written from the specification and vectors alone | **NOT met** — see below |
+| 2 | A second implementation, written from the specification and vectors alone | **met** — `servanda-py`, Node PASS 176/176, claim granted |
 | 3 | No known divergence between the specification and the reference implementation | **met** — §2's connector-transport requirement was withdrawn |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
 | 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open until **2026-08-16** — see the register below |
@@ -50,23 +50,46 @@ reformulated, and the reformulation is a narrowing that should be visible rather
 A Python derivation was built from the specification and the vectors, and it did real work: it
 found six disagreements, three of them defects in the reference implementation, all since fixed.
 
-**It no longer exists.** The derivation was produced to answer a question, its findings were
-absorbed, and the code was not kept. So what this project holds is a RECORD that a second
-implementation once agreed, not a second implementation — and the gate as written says "which
-passes the conformance suite", which nothing currently does. The suite has also grown since:
-`visibility/`, the collective-edge cases and `edge-id-does-not-bind-its-body` all postdate it, so
-even a preserved copy would not pass today without changes.
+**It was not kept**, and the gate was recorded as met for weeks on the strength of it. The code
+was thrown away once its findings were absorbed, so what the project actually held was a RECORD
+that a second implementation had once agreed. It is worth noting how that read while it was
+wrong — "**met** — see below" over a paragraph in the past tense — because that is what a gate
+looks like when it decays rather than being abandoned. Nobody changed it; the world moved.
 
-This was recorded as met until someone checked. It is worth noting how it read while it was
-wrong — "**met** — see below" over a paragraph that described a past event in the past tense —
-because that is what a gate looks like when it has quietly decayed rather than been abandoned.
+**A second implementation now exists and is kept.** `servanda-py` — a Python implementation of
+the Node level, ~1200 lines, written against `spec/`, `vectors/` and this repository's
+`tools/conformance-runner/PROTOCOL.md`, with the reference implementation and `tools/vectors-gen/`
+both out of reach (the generator's own verifier is the same problem one level down). It answers
+the runner's NDJSON protocol:
 
-**What it would take.** The conformance runner exists precisely so a third-party implementation
-can be graded without this repository's harness, and the NDJSON protocol is documented in
-`tools/conformance-runner/PROTOCOL.md`. An implementation that answers the Node-level ops and is
-run under it would meet the gate as written.
+```
+node run.mjs --vectors ../../vectors --claim node -- python3 .../servanda_node.py
+→ Node PASS 176/176, CLAIM GRANTED
+```
 
-**What it still would not be:** an independent author. Every implementation this project can
+That it computes rather than replays was checked rather than assumed: it reads no vector file,
+and its only JSON parsing is of the request it was handed.
+
+**It earned its keep on the first run** — see the finding below.
+
+### What it found
+
+**A conformance operation that could not be answered from its own input.**
+`signing_preimage` was handed `{signed_object, signer}` and required to distinguish
+`signature-by-another-key` from `signature-does-not-cover-this-object`. Those two inputs separate
+"not a signature" from "not a signature over this object" and go no further: naming *another* key
+requires having one. The op asked for a distinction without supplying the means.
+
+It passed anyway — by accumulating keys it had seen in earlier families and relying on
+`derivation` being asked before `signatures`. An ordering dependency `PROTOCOL.md` never stated,
+which its author found only because it wrote the whole thing from the document. The reference
+implementation could not have found it: it has every key in scope already.
+
+Fixed by supplying `known_keys`, exactly as `verify_inbox_record` already did and for the same
+stated reason. Naming the keys never rescues a bad signature; it lets a refusal say something
+true.
+
+**What it still is not:** an independent author. Every implementation this project can
 produce shares the priors of the one that wrote the specification, so the classes of mistake
 nobody thought to look for stay unlooked-for. Meeting the narrowed gate is worth doing; calling it
 "independent implementation" without this paragraph would be the claim the audit found this

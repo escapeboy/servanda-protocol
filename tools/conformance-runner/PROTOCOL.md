@@ -107,7 +107,7 @@ of its own.
 | `clip_to_octets` | `{value, limit_octets}` | `{clipped}` |
 | `bip39_seed` | `{mnemonic, passphrase}` | `{seed}` |
 | `derive_key` | `{mnemonic, passphrase, path}` | `{path, chain_code, private_key, public_key, persona_id}` |
-| `signing_preimage` | `{signed_object, signer}` | `{canonical, sha256_preimage, verifies, reason}` |
+| `signing_preimage` | `{signed_object, signer, known_keys}` | `{canonical, sha256_preimage, verifies, reason}` |
 | `verify_transitions` | `{edge, assertions}` | `{outcomes, final_state}` |
 | `verify_inbox_record` | `{record, known_keys}` | `{canonical, accepted, rejection_reason, actual_signer}` |
 | `oob_bootstrap` | `{message}` | `{canonical, payload_b64url, url, signature_verifies}` |
@@ -133,6 +133,15 @@ Notes on the shapes, where the shape encodes a rule:
   in full. The reasons are `signature-does-not-verify`, `signature-does-not-cover-this-object`
   and `signature-by-another-key`; an implementation that refuses everything fails on the
   positives, and one that refuses for the wrong reason fails on `reason`.
+
+  `known_keys` is supplied for the same reason `verify_inbox_record` gets it: **`signature-by-
+  another-key` is not decidable from a signed object and the persona it names.** Those two inputs
+  separate "not a signature" from "not a signature over this object" and go no further; naming
+  another key requires having one. The op asked for the distinction without supplying the means
+  until an independent implementation hit it — and passed anyway, by accumulating keys seen in
+  earlier families and relying on `derivation` being asked before `signatures`. That is an
+  ordering dependency this document never stated and no implementer should have to discover.
+  Supplying the keys never rescues a bad signature; it only lets a refusal say something true.
 
 - **`advertise_actions`** and **`act`** receive `window_elapsed` as input. Generation is
   clockless and so is the runner: an IUT that reads a clock here is answering a different

@@ -442,6 +442,25 @@ export function buildSignatures() {
       'conforms. The family carried five positives and no verdict until v0.2 — a `return true` ' +
       'verifier passed all five.',
     signing_rule: 'ed25519_sign(sha256(JCS(object minus "sig")), private_key)',
+    /**
+     * The keys in play, present for exactly the reason `addressing/inbox-records.json` carries
+     * the same member: so that a verifier can report WHICH other key signed a rejected object.
+     *
+     * Found by an independent implementation, and it is a defect in the question rather than in
+     * any answer. `signed-by-a-different-key` pins the reason `signature-by-another-key`, and
+     * "another key" is not decidable from a signed object and the persona it names — those two
+     * inputs distinguish "this signature is not over this object" from "this is not a signature"
+     * and nothing further. The independent implementation passed only by accumulating keys it had
+     * seen in EARLIER families and relying on `derivation` being asked before `signatures`, which
+     * is an ordering dependency no protocol states and no implementer should have to discover.
+     *
+     * Naming the keys does not weaken the case: it never rescues a bad signature, it only lets a
+     * refusal say something true about what went wrong.
+     */
+    known_keys: [ALICE, BOB, ORG_ROOT].map((p) => ({
+      label: p === ORG_ROOT ? 'org-root' : p === ALICE ? 'alice' : 'bob',
+      persona_id: p.personaId,
+    })),
     cases: [
       sign(
         'attestation-by-org-root',
