@@ -148,7 +148,35 @@ export interface Edge {
   closure_policy: 'on-evidence' | 'on-acceptance';
   acceptance_window: string | null;
   blocked_by: string[];
+  /** §4.7: present only on a collective edge (owner is a group key). */
+  fulfillment?: Fulfillment;
   supersedes: string | null;
+}
+
+/** §4.7 collective fulfillment. `k` is required by `k-of-n` and meaningless otherwise. */
+export interface Fulfillment {
+  policy: 'all' | 'any' | 'k-of-n';
+  k?: number;
+  children: string[];
+  coordinator?: string;
+}
+
+/**
+ * §4.7 + M-9: "a collective edge MUST have either `fulfillment.children` whose union covers
+ * fulfillment, or `fulfillment.coordinator`. Otherwise nodes MUST mark it unverifiable (no
+ * auto-escalation)" — which is M-8.
+ *
+ * A pure function of the edge, which is why the two MUSTs can be covered by a vector at all: an
+ * "escalation" is a local decision no vector can watch, but the flag that gates it is a value a
+ * verifier computes and can be asked to state.
+ */
+export function collectiveDecompositionValid(edge: Edge): boolean {
+  const f = edge.fulfillment;
+  if (!f) return true;
+  if (f.coordinator) return true;
+  if (f.children.length === 0) return false;
+  if (f.policy === 'k-of-n') return f.k !== undefined && f.k > 0 && f.k <= f.children.length;
+  return true;
 }
 
 export function makeEdge(opts: {
@@ -160,6 +188,7 @@ export function makeEdge(opts: {
   closure_policy?: 'on-evidence' | 'on-acceptance';
   acceptance_window?: string | null;
   blocked_by?: string[];
+  fulfillment?: Fulfillment;
   supersedes?: string | null;
 }): Edge {
   const closure_policy = opts.closure_policy ?? 'on-acceptance';
@@ -187,6 +216,9 @@ export function makeEdge(opts: {
           ? 'P5D'
           : null,
     blocked_by: opts.blocked_by ?? [],
+    // Omitted rather than nulled when absent: §4.1 lists `fulfillment` as present only on a
+    // collective edge, and a `"fulfillment": null` member would be a different object.
+    ...(opts.fulfillment ? { fulfillment: opts.fulfillment } : {}),
     supersedes: opts.supersedes ?? null,
   };
 }

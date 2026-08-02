@@ -520,6 +520,14 @@ function buildTransitionGroup(cases: TransitionCase[], kind: 'valid' | 'invalid'
     if (kind === 'invalid' && result.rejectedCount === 0) {
       throw new Error(`transition case "${c.name}" is in the invalid set but rejects nothing`);
     }
+    // Declared by hand like every other expectation, so the case tests the verifier rather than
+    // recording it. `?? false` because most cases are not collective and would otherwise all have
+    // to restate the obvious.
+    if (result.unverifiable !== (c.expectedUnverifiable ?? false)) {
+      throw new Error(
+        `transition case "${c.name}": expected unverifiable=${c.expectedUnverifiable ?? false}, got ${result.unverifiable}`,
+      );
+    }
 
     return {
       name: c.name,
@@ -532,6 +540,9 @@ function buildTransitionGroup(cases: TransitionCase[], kind: 'valid' | 'invalid'
         rejection_reason: o.accepted ? null : (o.reason ?? null),
       })),
       expected_final_state: result.finalState,
+      /** §4.7 / M-8 / M-9. False on every non-collective edge; stated on all of them so a
+       *  consumer never has to guess whether an absent member means false or means unchecked. */
+      expected_unverifiable: result.unverifiable,
     };
   });
 }

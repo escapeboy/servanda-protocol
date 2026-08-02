@@ -114,13 +114,26 @@ that did not happen.
   the editors. It was discharged by the editors anyway, as a deliberate decision to freeze v0.1
   rather than wait indefinitely for a reviewer who was never engaged.
 
-  What that decision does and does not buy: the values (m = 64 MiB, t = 3, p = 1) are concrete,
-  they are within the range RFC 9106 §4 describes for the memory-constrained case, and every wrap
-  records the triple it used, so a future revision can raise them without stranding old vaults.
-  What it does not buy is assurance. **No cryptographer has examined this parameter set**, and a
-  frozen v0.1 therefore ships one cryptographic assumption that rests on the editors' judgement.
-  An implementer who needs that assurance should obtain it independently; the gate is closed, not
-  satisfied.
+  What that decision does and does not buy: the values are concrete, they are within the range
+  RFC 9106 §4 describes, and every wrap records the triple it used, so a revision can raise them
+  without stranding old vaults. What it does not buy is assurance. **No cryptographer has examined
+  this parameter set**, and v0.1 therefore shipped one cryptographic assumption resting on the
+  editors' judgement. An implementer who needs that assurance should obtain it independently; the
+  gate is closed, not satisfied.
+
+  **v0.2 revisits the values and the process around them.** §9.3 now names two profiles rather
+  than one — a desktop default of m = 1 GiB, t = 2, p = 4 and the old triple as the
+  constrained-device floor — because the parameter that cuts an attacker's parallelism is memory,
+  and 64 MiB was RFC 9106's constrained-device point being used as a universal one. Two structural
+  gaps closed with it: "MAY raise" is now a permission with a required re-wrap path behind it
+  (before, a wrap could only ever be opened at the parameters it was made with, so the creation-day
+  value was the value for the vault's life), and §9.3 no longer takes no position on passphrase
+  generation, which is what actually decides the outcome at any setting in this range.
+
+  **The external review is no longer a v1 gate**, per [`docs/v1-criteria.md`](../docs/v1-criteria.md).
+  That does not upgrade anything above: it removes a gate this project was never going to meet
+  from inside itself, and moves the honest sentence to `SECURITY.md`, where it now stands alone
+  rather than as a temporary condition awaiting an audit.
 
 - **Trademark clearance of the name "Servanda" will not be performed.** The maintainer has decided
   against registering a mark. The name is therefore the project's name in use and nothing more: it

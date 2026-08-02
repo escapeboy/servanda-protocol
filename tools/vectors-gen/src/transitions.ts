@@ -11,7 +11,7 @@
  */
 
 import { verifyObject, fromHex } from './crypto.js';
-import { edgeId } from './protocol.js';
+import { collectiveDecompositionValid, edgeId } from './protocol.js';
 import type { Assertion, AssertionState, Edge } from './protocol.js';
 import type { Json } from './jcs.js';
 
@@ -64,6 +64,16 @@ const TERMINAL: EffectiveState[] = ['closed', 'released', 'superseded', 'expired
 export interface VerifyResult {
   outcomes: AssertionOutcome[];
   finalState: EffectiveState;
+  /**
+   * §4.7 / M-8 / M-9: a collective edge with neither covering children nor a named coordinator.
+   *
+   * Reported alongside the state rather than folded into it, because it is not a state — an
+   * unverifiable edge still has whatever state its chain gives it, and what M-8 forbids is
+   * ESCALATING on it. A vector cannot watch an escalation, which is a local decision; it can pin
+   * the flag the decision is gated on, and that is the difference between M-8 being a prose
+   * obligation and being a conformance requirement.
+   */
+  unverifiable: boolean;
   acceptedCount: number;
   rejectedCount: number;
 }
@@ -135,6 +145,7 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
   return {
     outcomes,
     finalState: st.state,
+    unverifiable: !collectiveDecompositionValid(edge),
     acceptedCount: outcomes.filter((o) => o.accepted).length,
     rejectedCount: outcomes.filter((o) => !o.accepted).length,
   };

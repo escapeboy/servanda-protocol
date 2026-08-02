@@ -18,6 +18,7 @@ import {
   type Assertion,
   type Commitment,
   type Edge,
+  type Fulfillment,
 } from './protocol.js';
 import type { EffectiveState, RejectionReason } from './transitions.js';
 
@@ -82,6 +83,42 @@ export const FOREIGN_EDGE_ID = makeEdge({
   proposed_at: '2026-07-26T09:00:00Z',
 }).edge_id;
 
+
+/**
+ * §4.7 collective edges. CAROL stands in for the group key: the rule under test is about the
+ * `fulfillment` member, and nothing in §4.1's preimage or §4.3's table distinguishes a group key
+ * from a persona key — §1.4 does, and that is not what these cases are pinning.
+ *
+ * The four differ ONLY in `fulfillment`, so a verifier cannot pass them by reading anything else.
+ */
+const collective = (fulfillment: Fulfillment, proposed_at: string): Edge =>
+  makeEdge({
+    commitment_hash: COMMITMENT_HASH,
+    owner: CAROL.personaId,
+    owed_to: BOB.personaId,
+    proposed_at,
+    due: T_DUE,
+    closure_policy: 'on-acceptance',
+    fulfillment,
+  });
+
+export const COLLECTIVE_COVERED = collective(
+  { policy: 'all', children: ['c1'.repeat(32), 'c2'.repeat(32)] },
+  '2026-07-25T09:10:00Z',
+);
+export const COLLECTIVE_COORDINATED = collective(
+  { policy: 'any', children: [], coordinator: ALICE.personaId },
+  '2026-07-25T09:11:00Z',
+);
+export const COLLECTIVE_BARE = collective(
+  { policy: 'all', children: [] },
+  '2026-07-25T09:12:00Z',
+);
+export const COLLECTIVE_IMPOSSIBLE_K = collective(
+  { policy: 'k-of-n', k: 3, children: ['c1'.repeat(32), 'c2'.repeat(32)] },
+  '2026-07-25T09:13:00Z',
+);
+
 const EV = evidenceHash('pr#341 merged; 11 tests');
 
 /** Shorthands for the two opening assertions every non-trivial chain needs. */
@@ -109,6 +146,8 @@ export interface TransitionCase {
   /** One entry per assertion: null = accepted, otherwise the required rejection reason. */
   expected: (RejectionReason | null)[];
   expectedFinalState: EffectiveState;
+  /** §4.7 / M-8 / M-9. Omitted on every non-collective edge, where it is false by definition. */
+  expectedUnverifiable?: boolean;
 }
 
 export const VALID_CASES: TransitionCase[] = [
@@ -363,9 +402,77 @@ export const VALID_CASES: TransitionCase[] = [
     expected: [null, null, null, null],
     expectedFinalState: 'disputed',
   },
+  {
+    name: 'collective-edge-with-covering-children',
+    description:
+      '§4.7 + M-9: a collective edge (owner is a group key) is verifiable when ' +
+      '`fulfillment.children` covers it. M-8 then does not apply — there is nothing to withhold ' +
+      'escalation from. The positive is here so that the two negatives below cannot be satisfied ' +
+      'by a verifier that marks every collective edge unverifiable.',
+    edge: COLLECTIVE_COVERED,
+    assertions: [
+      makeAssertion({ edge_id: COLLECTIVE_COVERED.edge_id, state: 'proposed', asserted_at: T_PROPOSED, signer: CAROL }),
+      makeAssertion({ edge_id: COLLECTIVE_COVERED.edge_id, state: 'confirmed', asserted_at: T_CONFIRMED, signer: BOB }),
+    ],
+    expected: [null, null],
+    expectedFinalState: 'open',
+    expectedUnverifiable: false,
+  },
+  {
+    name: 'collective-edge-with-a-named-coordinator',
+    description:
+      '§4.7: the other way to be verifiable. A coordinator is a person who answers for the ' +
+      'edge, so no decomposition is needed — the alternative is a group promise with nobody ' +
+      'accountable for it, which is what M-9 exists to refuse.',
+    edge: COLLECTIVE_COORDINATED,
+    assertions: [
+      makeAssertion({ edge_id: COLLECTIVE_COORDINATED.edge_id, state: 'proposed', asserted_at: T_PROPOSED, signer: CAROL }),
+    ],
+    expected: [null],
+    expectedFinalState: 'proposed',
+    expectedUnverifiable: false,
+  },
 ];
 
 export const INVALID_CASES: TransitionCase[] = [
+  {
+    name: 'collective-edge-with-neither-children-nor-coordinator',
+    description:
+      '§4.7 + M-9 + M-8: neither covering children nor a named coordinator, so the edge is ' +
+      'unverifiable and a node MUST NOT auto-escalate on it. Note what is and is not being ' +
+      'pinned: the ASSERTIONS are perfectly legal and are accepted, and the edge reaches `open` ' +
+      'normally. Escalation is a local decision no vector can watch — what a vector can pin is ' +
+      'the flag the decision is gated on, and a verifier that never computes it will report ' +
+      'false here and fail. This case is in the invalid set because the EDGE is what is at ' +
+      'fault, not any assertion in it.',
+    edge: COLLECTIVE_BARE,
+    assertions: [
+      makeAssertion({ edge_id: COLLECTIVE_BARE.edge_id, state: 'proposed', asserted_at: T_PROPOSED, signer: CAROL }),
+      makeAssertion({ edge_id: COLLECTIVE_BARE.edge_id, state: 'confirmed', asserted_at: T_CONFIRMED, signer: BOB }),
+      // And one that is genuinely illegal, so the case still rejects something — the invalid set
+      // means "a conforming node refuses part of this", and an unverifiable flag is not a refusal.
+      makeAssertion({ edge_id: COLLECTIVE_BARE.edge_id, state: 'released', asserted_at: T_ACCEPT, signer: CAROL }),
+    ],
+    expected: [null, null, 'wrong-signer-for-transition'],
+    expectedFinalState: 'open',
+    expectedUnverifiable: true,
+  },
+  {
+    name: 'collective-edge-with-k-greater-than-its-children',
+    description:
+      '§4.7 `k-of-n`: k = 3 over two children can never be satisfied, so the decomposition does ' +
+      'not cover fulfillment and the edge is unverifiable (M-9). A verifier that checked only ' +
+      'for a non-empty `children` list passes every other collective case and fails this one, ' +
+      'which is the reason it is here.',
+    edge: COLLECTIVE_IMPOSSIBLE_K,
+    assertions: [
+      makeAssertion({ edge_id: COLLECTIVE_IMPOSSIBLE_K.edge_id, state: 'proposed', asserted_at: T_PROPOSED, signer: CAROL }),
+      makeAssertion({ edge_id: COLLECTIVE_IMPOSSIBLE_K.edge_id, state: 'released', asserted_at: T_ACCEPT, signer: CAROL }),
+    ],
+    expected: [null, 'illegal-source-state'],
+    expectedFinalState: 'proposed',
+    expectedUnverifiable: true,
+  },
   {
     name: 'edge-id-does-not-bind-its-body',
     description:

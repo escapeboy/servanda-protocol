@@ -29,3 +29,12 @@ A scope is identified by its controlling key. No deeper nesting in v0.
 - Closed/expired/released/superseded edges: after the owner-configured retention window, nodes SHOULD delete commitment plaintext and MUST retain the edge + assertion chain (signed hashes) — "remember that, not what" (ADR-0004).
 - Scope-published copies follow the scope's retention policy, which MUST be visible to scope members.
 - Org escrow, if enabled for team scopes, MUST be announced in the scope descriptor (protocol-visible escrow, security §5). Personal scopes MUST NOT support escrow.
+
+**Deletion is bounded by the store, and an implementation MUST say where the bound falls.** "SHOULD delete" is a statement about the node's own view of its records. It is not, and cannot be made into, a guarantee that the bytes are gone: a store that is append-only by construction — a git repository, an append-only log, a filesystem with snapshots, a backup that already ran — keeps the deleted record reachable, and if one key opens every record then the key that opened it before still opens it. This is a structural conflict rather than an implementation defect. Forgetting and append-only are opposite properties, and no arrangement of records inside an append-only store resolves it, because whatever key opens a record must itself live somewhere the store cannot keep.
+
+An implementation therefore MUST document which of the two it delivers, in terms of who is doing the reading:
+
+- **against a reader of the node** — the record is gone, and every conforming implementation delivers this;
+- **against a reader of the underlying store** — the record is gone only if the implementation has arranged for its key to be destroyable, which requires key material to live outside the append-only store.
+
+A node MUST NOT present the first as the second. The reference implementation delivers the first and says so, in `retention.ts` and at the call site; a user deciding what to write into a commitment is entitled to know which promise they are relying on before they write it, not after the window elapses.

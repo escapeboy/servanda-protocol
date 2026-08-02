@@ -8,15 +8,28 @@ closed without a review being performed: the Ed25519 → X25519 birational map w
 than cleared (§6.3 is RFC 9180 HPKE over a persona's own X25519 key), and the Argon2id parameter
 set was *accepted by the editors*. §00 records which is which, and neither is a clearance.
 
-An external protocol security audit is planned before v1 and is a release gate (open questions,
-"External protocol security audit"). Until that audit completes, treat every cryptographic
-construction in `spec/09-threat-model.md` as unreviewed:
+**An external audit is no longer carried as a v1 release gate**, and that is a decision rather
+than an omission — [`docs/v1-criteria.md`](docs/v1-criteria.md) records the reasoning. It changes
+nothing about the sentence above: **no cryptographer outside this project has examined any of
+this**, and removing a gate that was never going to be met does not make the constructions any
+more reviewed. If anything it makes this page more load-bearing, because it is now the only place
+that says so.
 
-- Ed25519 → X25519 conversion via the birational map for transport encryption (§6.3, §9.3) — see
-  issue #7.
-- The ad-hoc X25519 + XChaCha20-Poly1305 profile, pending HPKE migration (§6.3) — see issue #6.
-- Argon2id parameters (§9.3) — see issue #7.
-- The commitment hash preimage and its five-field domain (§3.2) — see issue #8.
+Treat every construction in `spec/09-threat-model.md` as unreviewed. Two of the four items this
+section used to list have since been removed from the specification rather than cleared, and the
+distinction matters when you are deciding what to trust:
+
+- **Removed, not reviewed.** The Ed25519 → X25519 birational map is gone: §6.3 is HPKE (RFC 9180)
+  over a persona's own X25519 key, so no key pair serves two algorithms. The ad-hoc
+  X25519 + XChaCha20-Poly1305 profile is gone with it. Standard primitives used in standard ways,
+  with the RFC's own vectors as an oracle — a better outcome than a review, but not one.
+- **Still resting on the editors' judgement.** The §9.3 Argon2id profiles, and the §3.2 commitment
+  hash preimage with its five-field domain.
+
+An adversarial pass in August 2026 found nine breaks in the reference implementation, six of which
+were fixed. **It was run by agents the editor spawned, which makes it the editor reviewing the
+editor** — same priors, no independent selection, no accountability. It is not a review and is
+recorded here so that it is never mistaken for one.
 
 Do not deploy an implementation of this draft where a compromise would matter.
 
