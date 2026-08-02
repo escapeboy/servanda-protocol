@@ -93,8 +93,9 @@ Every released version tags the repository and pins the vectors that define it.
 **"Implements Servanda" means "passes the conformance suite."** Not "was written by the editors", not
 "looks like the reference implementation".
 
-- The suite is `vectors/` plus the property tests that consume them (§8 lists v0 scope: canonical
-  form, signatures, transition-table rejection, visibility matrix, M-11 negative tests).
+- The suite is `vectors/` plus the property tests that consume them (§8 lists v0 scope, and also counts what it does
+  NOT cover — eight MUSTs have no vector at all, which by the rule below makes them prose
+  obligations rather than conformance requirements today, #42).
 - A claim of conformance names the suite version it passed and the conformance level it claims
   (Node / Federating node / Hub / Client, per §8).
 - **A behaviour not covered by the suite is not yet a conformance requirement**, however clearly the
