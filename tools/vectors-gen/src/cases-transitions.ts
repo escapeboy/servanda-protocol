@@ -471,6 +471,27 @@ export const VALID_CASES: TransitionCase[] = [
     expectedFinalState: 'contested-closure',
   },
   {
+    name: 'contested-closure-expires-after-the-window',
+    description:
+      '§4.4: the third exit, and `contested-closure` needs it for exactly the reason `disputed` ' +
+      'does. Both other resolutions require BOTH parties, so without this a contest is a ' +
+      'unilateral act that freezes an edge permanently — the trap §4.4 already names and already ' +
+      'refused to build. It is worse here if the exit is missing: `disputed` costs its author an ' +
+      '`evidence_hash`, and reaching a contest costs nothing but a timestamp, so an implementation ' +
+      'that gives `disputed` this exit and withholds it here has built the stronger weapon and ' +
+      'handed it out free. It decides nothing about the merits: both acts stay in the chain.',
+    edge: EDGE_EVIDENCE,
+    assertions: [
+      proposed(EDGE_EVIDENCE),
+      confirmed(EDGE_EVIDENCE),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_EVIDENCE, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'released', asserted_at: T_EVIDENCE, signer: BOB }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'expired', asserted_at: T_AFTER_DISPUTE_WINDOW, signer: ALICE }),
+    ],
+    expected: [null, null, null, null, null],
+    expectedFinalState: 'expired',
+  },
+  {
     name: 'contested-closure-left-by-both-parties',
     description:
       '§4.4: `contested-closure` is not terminal. Both parties assert `closed` and the edge ' +
@@ -528,6 +549,26 @@ export const INVALID_CASES: TransitionCase[] = [
     expected: [null, 'illegal-source-state'],
     expectedFinalState: 'proposed',
     expectedUnverifiable: true,
+  },
+  {
+    name: 'contested-closure-expiry-before-the-window-elapsed',
+    description:
+      '§4.4: the escape is not immediate. `dispute_window` runs from the contest, and until it ' +
+      'has elapsed the edge stays where both parties put it — otherwise contesting and then ' +
+      'expiring would be one move, and the state would resolve nothing.',
+    edge: EDGE_EVIDENCE,
+    assertions: [
+      proposed(EDGE_EVIDENCE),
+      confirmed(EDGE_EVIDENCE),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'closed', asserted_at: T_EVIDENCE, signer: ALICE, evidence_hash: EV }),
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'released', asserted_at: T_EVIDENCE, signer: BOB }),
+      // The window runs from the CONTEST, not from the dispute the shared constants were sized
+      // for — one day earlier, so `T_DISPUTE_WINDOW_OPEN` is already past it. A day after the
+      // contest is unambiguously inside.
+      makeAssertion({ edge_id: EDGE_EVIDENCE.edge_id, state: 'expired', asserted_at: T_ACCEPT, signer: ALICE }),
+    ],
+    expected: [null, null, null, null, 'dispute-window-not-elapsed'],
+    expectedFinalState: 'contested-closure',
   },
   {
     name: 'a-later-release-does-not-contest-it-answers',

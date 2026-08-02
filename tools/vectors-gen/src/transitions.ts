@@ -93,6 +93,8 @@ interface MutableState {
   contestPending: boolean;
   contestClosedBy: Set<string>;
   contestSupersededBy: Set<string>;
+  /** §4.4: when the contest was recorded — the instant `dispute_window` runs from. */
+  contestedAt: string | null;
   /** asserted_at of the accepted `disputed` assertion — when `dispute_window` starts running. */
   disputedAt: string | null;
   /**
@@ -160,6 +162,7 @@ export function verifyChain(edge: Edge, assertions: Assertion[]): VerifyResult {
     contestPending: false,
     contestClosedBy: new Set(),
     contestSupersededBy: new Set(),
+    contestedAt: null,
     disputedAt: null,
     latestBySigner: new Map(),
   };
@@ -249,6 +252,7 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
     // `evaluate` decides; `apply` moves the state. Setting it here would be overwritten by the
     // ordinary row a moment later — which is exactly what happened the first time.
     st.contestPending = true;
+    st.contestedAt = a.asserted_at;
     return null;
   }
 
@@ -268,6 +272,16 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
       const bad = both(st.contestSupersededBy);
       if (bad) return bad;
       if (st.contestSupersededBy.size === 2) st.state = 'superseded';
+      return null;
+    }
+    // §4.4's third exit. Both resolutions above need BOTH parties, so without this a contest is a
+    // unilateral permanent freeze — and one that costs no `evidence_hash`, where `disputed` does.
+    if (a.state === 'expired') {
+      if (st.contestedAt === null) return 'illegal-source-state';
+      if (Date.parse(a.asserted_at) < addDuration(st.contestedAt, DISPUTE_WINDOW)) {
+        return 'dispute-window-not-elapsed';
+      }
+      st.state = 'expired';
       return null;
     }
     return 'illegal-source-state';

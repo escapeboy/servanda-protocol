@@ -83,6 +83,7 @@ The edge's current state = the latest valid assertion per the transition table. 
 | open | contested-closure | — (computed; no signer) | two parties took **different** unilateral exits concurrently — §4.6 |
 | contested-closure | closed | owner + owed_to (both assert) | agreement, exactly as from `disputed` |
 | contested-closure | superseded | owner + owed_to (both assert) | agreement |
+| contested-closure | expired | either party, only once `dispute_window` has elapsed | **not a verdict** — §4.4, the same exit `disputed` has |
 
 Any assertion violating this table is **invalid** and MUST be discarded by conforming nodes (this is how constitutional rules bind rude clients).
 
@@ -133,7 +134,11 @@ Three properties make this the resolution rather than one of the alternatives, a
 2. **Nothing signed is discarded.** A deterministic tie-break — lowest hash, earliest timestamp — also converges, and does so by voiding one party's signed act in a protocol whose whole premise is that a signed act stands. It would also decide by `asserted_at`, a value written by the party it judges.
 3. **It is unverifiable in the sense of M-8**, and a node MUST NOT auto-escalate on it. The edge is not resolved; two people disagree about how it ended, and the protocol's job here is to make that visible rather than to pick a winner — the same position §4.4 takes on disputes and §4.1 takes on divergent edge bodies.
 
-`contested-closure` is NOT terminal. It is left the way `disputed` is left: both parties assert `closed`, or both assert `superseded`. A state two people can enter by accident and cannot leave together would be a worse trap than the divergence it replaces.
+`contested-closure` is NOT terminal, and it has **all three** of the exits `disputed` has: both parties assert `closed`, both assert `superseded`, or — once `dispute_window` has elapsed from the contest — either party alone asserts `expired`.
+
+The third one is not optional, and the argument is the one this section already makes two paragraphs above. Without it both resolutions require both parties, so reaching a contest becomes a unilateral act that freezes an edge permanently, and a counterparty who contests and then goes silent leaves an owner who may have genuinely fulfilled the commitment holding an edge that can never close, never expire and never be superseded. **A state two people can enter by accident and cannot leave alone is a worse trap than the divergence it replaces.**
+
+It is worse here than in the `disputed` case if the escape is missing, which is why this is stated rather than left to be inferred: `disputed` costs its author an `evidence_hash`, and a contest costs nothing but a timestamp. An implementation that gives `disputed` the third exit and withholds it here has built the stronger weapon and handed it out for free.
 
 **Only a concurrent act contests.** An assertion whose `asserted_at` is LATER than the exit it conflicts with MUST NOT produce `contested-closure`; it is judged by the ordinary rows, which is to say discarded. An act dated after the one it conflicts with could have been a response to it, and §4.3 already says what the answers to an exit are — accept it, or dispute it. This comparison is between two self-written timestamps, which §4.3 otherwise distrusts, and it is sound here for a specific reason: backdating buys nothing. A counterparty who wants to stop a closure already has `disputed`, legal from `pending-acceptance`, with the same blocking effect and an `evidence_hash` attached. No position is reachable by lying that is not reachable honestly.
 
