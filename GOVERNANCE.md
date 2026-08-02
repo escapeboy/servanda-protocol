@@ -114,6 +114,13 @@ Every released version tags the repository and pins the vectors that define it.
   implementation-defined, and §-text says *that* and the vector stops pinning it. Either way the
   resolution lands in the spec, and either way it is normative — so it bumps the minor version.
 
+  It has now fired seven times. The seventh was found by the independent implementation built for
+  gate 2, which is the mechanism working exactly as this clause predicts: §7 said `args` was "the
+  input object the client passes to `tool` verbatim", the vectors pinned a PARTIAL input, and a
+  reader who took the sentence at its word would have produced a malformed tool call. The
+  implementer had to guess, guessed right, and left a comment saying so — which is the only reason
+  anyone found out.
+
   This is how #44 was resolved: six surface rules — advertised-act gating, `actions` array order,
   where `ping` belongs, the reason-projection table, whether the canonical-form bound includes
   `id`, and what a "level" is — had been decided by the generator and by no sentence anyone could
