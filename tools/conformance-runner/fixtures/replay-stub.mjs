@@ -73,6 +73,17 @@ const MUTATIONS = {
   'node-surface-verification-levels#negative-name-not-shown-at-ext': (r) => ({
     ...r, display_name: 'Georgi Petrov', name_bearing: true,
   }),
+  // M-4b: serving an edge to a scope member it was never published to. The single most likely
+  // way to get visibility wrong, because it is what you get by resolving membership first and
+  // treating the publish record as a detail — and it passes every positive case in the family.
+  'visibility#a-scope-member-is-refused-an-UNPUBLISHED-edge': () => ({
+    serve: true, via: 'scope', scope: 'membership',
+  }),
+  // M-8: reporting a collective edge with no decomposition and no coordinator as verifiable,
+  // which is what an implementation that never computes the flag reports for everything.
+  'transitions-invalid#collective-edge-with-neither-children-nor-coordinator': (r) => ({
+    ...r, unverifiable: false,
+  }),
 };
 
 const DEFAULT_FAULTS = Object.keys(MUTATIONS);
@@ -118,7 +129,7 @@ const ALL_OPS = [
   'canonicalize', 'commitment_hash', 'envelope_id', 'envelope_bounds', 'clip_to_octets',
   'bip39_seed', 'derive_key', 'signing_preimage', 'verify_transitions',
   'verify_inbox_record', 'oob_bootstrap', 'recover_request', 'advertise_actions', 'act',
-  'judge_brief_slot', 'grade_verification',
+  'judge_brief_slot', 'grade_verification', 'may_serve_edge',
 ];
 
 for await (const line of createInterface({ input: process.stdin })) {

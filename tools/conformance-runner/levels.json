@@ -1,50 +1,54 @@
 {
-  "$comment": "Which vector families each §8 conformance level requires. This file is SCOPE, never ORACLE: it names files and cites the sentence that puts them at a level, and contains no expected value from any case. Expected values live in vectors/ and are read from there at run time. Keeping the mapping here rather than in code is deliberate — it is the one part of the runner that is a reading of §8 rather than a fact about the vectors, so it should be readable and arguable without opening a .mjs file.",
+  "$comment": "Which vector families each \u00a78 conformance level requires. This file is SCOPE, never ORACLE: it names files and cites the sentence that puts them at a level, and contains no expected value from any case. Expected values live in vectors/ and are read from there at run time. Keeping the mapping here rather than in code is deliberate \u2014 it is the one part of the runner that is a reading of \u00a78 rather than a fact about the vectors, so it should be readable and arguable without opening a .mjs file.",
   "spec_reference": "spec/08-conformance.md",
   "families": {
     "canonicalization": {
       "file": "canonicalization/jcs.json",
-      "basis": "§0 Conventions (RFC 8785 JCS). Every identifier, hash and signing preimage in the protocol is defined over the canonical form, so a node that cannot canonicalize cannot reach any level."
+      "basis": "\u00a70 Conventions (RFC 8785 JCS). Every identifier, hash and signing preimage in the protocol is defined over the canonical form, so a node that cannot canonicalize cannot reach any level."
     },
     "derivation": {
       "file": "derivation/persona-keys.json",
-      "basis": "§1.1–§1.2. A persona_id IS the public key; the whole verification model rests on the derivation being the one §1.1 specifies."
+      "basis": "\u00a71.1\u2013\u00a71.2. A persona_id IS the public key; the whole verification model rests on the derivation being the one \u00a71.1 specifies."
     },
     "signatures": {
       "file": "signatures/signatures.json",
-      "basis": "§0 Conventions, §1.3, §1.7, §4.2 — the signing preimage."
+      "basis": "\u00a70 Conventions, \u00a71.3, \u00a71.7, \u00a74.2 \u2014 the signing preimage."
     },
     "hashing": {
       "file": "hashing/commitment-hash.json",
-      "basis": "§3.2. L0 (vault): the commitment_hash is what fan-out shares (M-3)."
+      "basis": "\u00a73.2. L0 (vault): the commitment_hash is what fan-out shares (M-3)."
     },
     "envelope-id": {
       "file": "envelope/envelope-id.json",
-      "basis": "§2. §8 puts the envelope in the Node level via M-19; the id preimage is the other half of §2 and is meaningless without it."
+      "basis": "\u00a72. \u00a78 puts the envelope in the Node level via M-19; the id preimage is the other half of \u00a72 and is meaningless without it."
     },
     "envelope-bounds": {
       "file": "envelope/bounds.json",
-      "basis": "M-19, named explicitly in the Node level: \"a node MUST NOT canonicalize an envelope exceeding the §2 bounds\"."
+      "basis": "M-19, named explicitly in the Node level: \"a node MUST NOT canonicalize an envelope exceeding the \u00a72 bounds\"."
     },
     "transitions-valid": {
       "file": "transitions/valid.json",
-      "basis": "§4.3–§4.5, L1. M-14."
+      "basis": "\u00a74.3\u2013\u00a74.5, L1. M-14."
     },
     "transitions-invalid": {
       "file": "transitions/invalid.json",
       "basis": "M-14, named in the Node level: \"Assertions violating the transition table are invalid and MUST be discarded\"."
     },
+    "visibility": {
+      "file": "visibility/matrix.json",
+      "basis": "\u00a75.3, M-4. Reached at the Node level through the range M-1..M-16. \u00a78 named this family as v0 suite scope for months while it did not exist; it does now, and the entry that used to sit in this level's `unreachable` list has moved here."
+    },
     "node-surface-actions": {
       "file": "node-surface/actions.json",
-      "basis": "M-20, named in the Node level and again in the Client level. §8: \"M-21 on open_loops by actions.json\"."
+      "basis": "M-20, named in the Node level and again in the Client level. \u00a78: \"M-21 on open_loops by actions.json\"."
     },
     "node-surface-act-tool": {
       "file": "node-surface/act-tool.json",
-      "basis": "M-20, named in the Node level: \"MUST NOT bind an advertised act to a tool call that produces no assertion\". The Client half of M-20 — \"MUST NOT invent a tool binding for an act the node reports as unbound\" — is the same vocabulary read from the other side."
+      "basis": "M-20, named in the Node level: \"MUST NOT bind an advertised act to a tool call that produces no assertion\". The Client half of M-20 \u2014 \"MUST NOT invent a tool binding for an act the node reports as unbound\" \u2014 is the same vocabulary read from the other side."
     },
     "node-surface-brief-slots": {
       "file": "node-surface/brief-slots.json",
-      "basis": "M-21. §8 names M-21 in the Client level ONLY — the Node level lists M-1..M-16, M-19, M-20 — yet §8 also says \"the node halves of both are covered by the node-surface vectors: ... on brief by brief-slots.json\", and every case in the file judges what a NODE may emit. See findings/1 in README.md. Required for Client, advisory for Node."
+      "basis": "M-21. \u00a78 names M-21 in the Client level ONLY \u2014 the Node level lists M-1..M-16, M-19, M-20 \u2014 yet \u00a78 also says \"the node halves of both are covered by the node-surface vectors: ... on brief by brief-slots.json\", and every case in the file judges what a NODE may emit. See findings/1 in README.md. Required for Client, advisory for Node."
     },
     "node-surface-verification-levels": {
       "file": "node-surface/verification-levels.json",
@@ -52,22 +56,22 @@
     },
     "addressing-inbox": {
       "file": "addressing/inbox-records.json",
-      "basis": "§6.7, M-17. M-17 is outside the Node range (M-1..M-16, M-19, M-20) and arrives only through the Federating node's \"+ §6\"."
+      "basis": "\u00a76.7, M-17. M-17 is outside the Node range (M-1..M-16, M-19, M-20) and arrives only through the Federating node's \"+ \u00a76\"."
     },
     "addressing-oob": {
       "file": "addressing/oob-bootstrap.json",
-      "basis": "§6.7 out-of-band bootstrap, M-18."
+      "basis": "\u00a76.7 out-of-band bootstrap, M-18."
     },
     "recovery": {
       "file": "recovery/proof-of-possession.json",
-      "basis": "§6.6, named explicitly in the Federating node level: \"recovery responder\"."
+      "basis": "\u00a76.6, named explicitly in the Federating node level: \"recovery responder\"."
     }
   },
   "levels": [
     {
       "id": "node",
       "title": "Node",
-      "quote": "Node (minimum): L0–L1 + §7 six tools + M-1..M-16, M-19, M-20.",
+      "quote": "Node (minimum): L0\u2013L1 + \u00a77 six tools + M-1..M-16, M-19, M-20.",
       "inherits": [],
       "required": [
         "canonicalization",
@@ -78,50 +82,59 @@
         "envelope-bounds",
         "transitions-valid",
         "transitions-invalid",
+        "visibility",
         "node-surface-actions",
         "node-surface-act-tool",
         "node-surface-verification-levels"
       ],
-      "advisory": ["node-surface-brief-slots"],
+      "advisory": [
+        "node-surface-brief-slots"
+      ],
       "max_verdict": "pass",
       "unreachable": [
-        "M-1, M-3, M-5, M-6, M-7, M-9, M-10, M-13, M-15, M-16 have no vector family. They are Node MUSTs that no case in vectors/ exercises; passing this level says nothing about them.",
-        "M-4 (visibility follows participation) — §8's suite scope names \"visibility matrix tests\", and no such family exists in vectors/.",
-        "§7's six tools are exercised only through act, confirm-binding and brief/open_loops shapes. There is no vector that enumerates the six or checks that a node offers all of them.",
-        "The 256-level canonicalizer refusal depth (envelope/bounds.json, canonicalizer_refusal) is stated \"rather than given a case\" and is not checked."
+        "M-1, M-3, M-5, M-6, M-7, M-10, M-13, M-15, M-16 have no vector family. They are Node MUSTs that no case in vectors/ exercises; passing this level says nothing about them. M-9 left this list when transitions/ gained the collective-edge cases, and M-4 when visibility/ was written \u2014 the list is maintained by subtraction, so an entry that stays is one nobody has been able to remove rather than one nobody has looked at.",
+        "\u00a77's six tools are exercised only through act, confirm-binding and brief/open_loops shapes. There is no vector that enumerates the six or checks that a node offers all of them.",
+        "The 256-level canonicalizer refusal depth (envelope/bounds.json, canonicalizer_refusal) is stated \"rather than given a case\" and is not checked.",
+        "M-8 is covered only in the half a vector can reach: `expected_unverifiable` pins that a node computes the flag auto-escalation is gated on. Whether it then declines to escalate is a local decision this runner cannot observe."
       ]
     },
     {
       "id": "federating-node",
       "title": "Federating node",
-      "quote": "Federating node: + §6 (one transport, recon, recovery responder).",
-      "inherits": ["node"],
-      "required": ["addressing-inbox", "addressing-oob", "recovery"],
+      "quote": "Federating node: + \u00a76 (one transport, recon, recovery responder).",
+      "inherits": [
+        "node"
+      ],
+      "required": [
+        "addressing-inbox",
+        "addressing-oob",
+        "recovery"
+      ],
       "advisory": [],
       "max_verdict": "pass",
       "unreachable": [
-        "\"one transport\" — no vector family exercises a transport. §6.1–§6.2 wire behaviour is entirely outside the suite.",
-        "\"recon\" (§6.4 reconciliation) — no vector family. The suite checks the recovery responder (§6.6) and addressing (§6.7) only.",
-        "The out-of-band serialization is an INTERPRETATION, not normative (vectors/README.md, gap 9): §6.7 fixes no serialization for the URL/QR form. Passing addressing-oob shows agreement with the suite's choice, not with the spec."
+        "\"one transport\" \u2014 no vector family exercises a transport. \u00a76.1\u2013\u00a76.2 wire behaviour is entirely outside the suite.",
+        "\"recon\" (\u00a76.4 reconciliation) \u2014 no vector family. The suite checks the recovery responder (\u00a76.6) and addressing (\u00a76.7) only.",
+        "The out-of-band serialization is an INTERPRETATION, not normative (vectors/README.md, gap 9): \u00a76.7 fixes no serialization for the URL/QR form. Passing addressing-oob shows agreement with the suite's choice, not with the spec."
       ]
     },
     {
       "id": "hub",
       "title": "Hub",
-      "quote": "Hub: §6.3 blind-courier requirements + M-11.",
+      "quote": "Hub: \u00a76.3 blind-courier requirements + M-11.",
       "inherits": [],
       "required": [],
       "advisory": [],
       "max_verdict": "not-assessable",
       "unreachable": [
-        "§6.3 blind-courier requirements — no vector family exists.",
-        "M-11 (no network-level reputation) — §8's suite scope names \"M-11 negative tests\" as v0 scope, and no such family exists in vectors/. A negative of this shape is also the hardest kind to write as a vector: it pins the absence of a computation, and a request/response probe cannot see a statistic a hub keeps and does not serve."
+        "\u00a76.3 blind-courier requirements \u2014 no vector family exists.",
+        "M-11 (no network-level reputation) \u2014 \u00a78's suite scope names \"M-11 negative tests\" as v0 scope, and no such family exists in vectors/. A negative of this shape is also the hardest kind to write as a vector: it pins the absence of a computation, and a request/response probe cannot see a statistic a hub keeps and does not serve."
       ]
     },
     {
       "id": "client",
       "title": "Client",
-      "quote": "Client: §7 consumer + M-12, M-20 and M-21 display rules.",
+      "quote": "Client: \u00a77 consumer + M-12, M-20 and M-21 display rules.",
       "inherits": [],
       "required": [
         "node-surface-actions",
@@ -132,7 +145,7 @@
       "advisory": [],
       "max_verdict": "partial",
       "unreachable": [
-        "The client halves of M-12 and M-21 — \"MUST NOT render an attested display name above its evidence level\", \"a client MUST author the wording of every affordance it renders\" — are not reachable by vectors. §8: \"A vector pins what a node emits. It cannot inspect what a client paints.\" They are judged by a rendered-fact-set harness (@servanda/client-conformance), not by this runner.",
+        "The client halves of M-12 and M-21 \u2014 \"MUST NOT render an attested display name above its evidence level\", \"a client MUST author the wording of every affordance it renders\" \u2014 are not reachable by vectors. \u00a78: \"A vector pins what a node emits. It cannot inspect what a client paints.\" They are judged by a rendered-fact-set harness (@servanda/client-conformance), not by this runner.",
         "The four families above pin the NODE halves. Passing them shows the implementation agrees about what may cross the node surface; it says nothing about what it draws. This is why the Client level can reach `partial` here and never `pass`."
       ]
     }

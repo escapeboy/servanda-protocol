@@ -8,9 +8,9 @@
 // never "at least" — a superset passes a count and hides a regression.
 
 import { spawnSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +61,12 @@ const JCS = ['--', 'node', resolve(HERE, 'fixtures/jcs-node-stub.mjs')];
     'addressing-inbox#invalid-signed-by-hub',
     'envelope-bounds#payload-string-over-the-limit',
     'node-surface-verification-levels#negative-name-not-shown-at-ext',
+    // v0.2, tenth and eleventh: the two families that closed M-4, M-8 and M-9. Both faults are
+    // the permissive reading of their rule — serve a member an edge nobody published, and report
+    // an undecomposed collective edge as verifiable — which is what an implementation that
+    // skipped the rule entirely would answer.
+    'visibility#a-scope-member-is-refused-an-UNPUBLISHED-edge',
+    'transitions-invalid#collective-edge-with-neither-children-nor-coordinator',
   ];
   const { exit, report } = run('faults', ['--claim', 'node,federating-node', ...STUB,
     '--fault-set', 'default']);
@@ -71,16 +77,36 @@ const JCS = ['--', 'node', resolve(HERE, 'fixtures/jcs-node-stub.mjs')];
   check('faults: both claims refused', report.claims.every((c) => !c.granted));
 
   const byId = Object.fromEntries(report.levels.map((l) => [l.id, l]));
-  check('faults: node fails on its six', setEq(byId.node.failed, [
+  check('faults: node fails on its eight', setEq(byId.node.failed, [
     'signatures#signed-by-a-different-key',
     'canonicalization#string-escapes-solidus',
     'transitions-invalid#owner-self-confirms',
+    'transitions-invalid#collective-edge-with-neither-children-nor-coordinator',
     'node-surface-actions#open-owner',
     'envelope-bounds#payload-string-over-the-limit',
     'node-surface-verification-levels#negative-name-not-shown-at-ext',
+    'visibility#a-scope-member-is-refused-an-UNPUBLISHED-edge',
   ]), JSON.stringify(byId.node.failed));
   check('faults: the §6 families land on federating-node only',
     byId['federating-node'].failed.length === byId.node.failed.length + 2);
+  // The hole this found in its own grader: a required family with no results contributed zero
+  // cases and zero failures, so a level whose requirements named a family the loader did not know
+  // graded PASS on the strength of never having run it. Reachable by a one-line edit to
+  // levels.json, which is exactly how it happened.
+  {
+    const levels = JSON.parse(readFileSync(new URL('./levels.json', import.meta.url), 'utf8'));
+    levels.levels.find((l) => l.id === 'node').required.push('a-family-nobody-implemented');
+    const tmp = join(mkdtempSync(join(tmpdir(), 'servanda-runner-')), 'levels.json');
+    writeFileSync(tmp, JSON.stringify(levels));
+    const { exit, report } = run('missing-family', ['--claim', 'node', '--levels', tmp, ...STUB]);
+    const node = report.levels.find((l) => l.id === 'node');
+    check('missing family: the level is not graded', node.verdict === 'not-assessable',
+      `verdict ${node.verdict}`);
+    check('missing family: the reason names it',
+      node.unreachable.some((u) => u.includes('a-family-nobody-implemented')));
+    check('missing family: the claim is refused', exit === 2 && report.claims.every((c) => !c.granted));
+  }
+
   check('faults: brief-slots is advisory at node, required at client',
     byId.node.advisory.failed.length === 1
     && byId.client.failed.includes('node-surface-brief-slots#invalid-label-on-the-primary-action'));

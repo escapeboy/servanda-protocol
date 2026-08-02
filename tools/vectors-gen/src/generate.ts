@@ -51,8 +51,10 @@ import {
 } from './crypto.js';
 import { buildEnvelopeId, buildEnvelopeBounds } from './envelope.js';
 import { buildRecovery } from './recovery.js';
+import { buildVisibilityCases, decideVisibility } from './visibility.js';
 import { CANONICALIZATION_CASES } from './cases-canonicalization.js';
 import {
+  EDGE_ACCEPTANCE,
   INVALID_CASES,
   VALID_CASES,
   baseCommitment,
@@ -105,6 +107,51 @@ export function buildEnvelopeBoundsFamily() {
   return {
     ...banner('spec/02-signal-envelope.md §2 (bounds), spec/08-conformance.md M-19'),
     ...buildEnvelopeBounds(),
+  };
+}
+
+/**
+ * §5.3 visibility. The expectation is COMPUTED by the reference decision rather than declared by
+ * hand, and that is a weaker guarantee than the transition family's — there, every outcome is
+ * hand-written and generation fails if the verifier disagrees, so the cases test the verifier.
+ * Here they record it.
+ *
+ * The compensation is structural rather than a promise: `expected` is asserted below to contain
+ * cases on BOTH sides of every rule, so a decision function that collapsed to "always refuse" or
+ * "always serve" cannot produce this file. That is what a generated expectation can be made to
+ * prove; it is not the same as a hand-declared one, and saying so is cheaper than discovering it.
+ */
+export function buildVisibility() {
+  const cases = buildVisibilityCases(EDGE_ACCEPTANCE).map((c) => ({
+    ...c,
+    expected: decideVisibility(c.input),
+  }));
+
+  const served = cases.filter((c) => c.expected.serve);
+  const refused = cases.filter((c) => !c.expected.serve);
+  if (served.length === 0 || refused.length === 0) {
+    throw new Error('visibility cases must exercise both outcomes; a one-sided family proves nothing');
+  }
+  for (const rule of ['M-4a', 'M-4b', 'M-4c'] as const) {
+    if (!cases.some((c) => c.rule === rule)) {
+      throw new Error(`visibility family covers no ${rule} case`);
+    }
+  }
+
+  return {
+    ...banner('spec/05-scopes-visibility.md §5.2–§5.3, spec/08-conformance.md M-4'),
+    description:
+      'The §5.3 visibility matrix: whether a node serves an edge to a requester. §8 named this ' +
+      'family as v0 suite scope for months while it did not exist, which is how M-4 came to be ' +
+      'presented as covered. Every input is a document and the decision has observable output — a ' +
+      '§6.4 recon response either carries the edge or does not — which is why M-4 is vectorable ' +
+      'where M-5 and M-11 are not.',
+    note:
+      'The rule is stated in the negative: a node serves only when it can NAME the grant, and the ' +
+      'default is refusal. Built the other way round — refuse when a rule forbids it — an ' +
+      'implementation is one missing rule away from serving somebody else’s relationships to a ' +
+      'stranger, and every positive case here would still pass.',
+    cases,
   };
 }
 
@@ -1029,6 +1076,7 @@ export function buildAll(): GeneratedFile[] {
     { path: 'addressing/inbox-records.json', content: serialize(buildAddressingInbox()) },
     { path: 'addressing/oob-bootstrap.json', content: serialize(buildAddressingOob()) },
     { path: 'recovery/proof-of-possession.json', content: serialize(buildRecoveryFamily()) },
+    { path: 'visibility/matrix.json', content: serialize(buildVisibility()) },
     { path: 'node-surface/actions.json', content: serialize(buildNodeSurfaceActions()) },
     { path: 'node-surface/brief-slots.json', content: serialize(buildNodeSurfaceBriefSlots()) },
     { path: 'node-surface/act-tool.json', content: serialize(buildNodeSurfaceActTool()) },

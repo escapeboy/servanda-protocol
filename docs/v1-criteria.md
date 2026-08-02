@@ -12,9 +12,9 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 
 | # | Gate | State |
 |---|---|---|
-| 1 | Every §8 MUST is either covered by a vector or **counted** as a prose obligation, with no third category | open ([#42](../../issues/42)) |
+| 1 | Every §8 MUST is either covered by a vector or **counted** as a prose obligation, with no third category | **met** — five prose obligations, each with its reason ([#42](../../issues/42)) |
 | 2 | A second implementation, written from the specification and vectors alone | **met** — see below |
-| 3 | No known divergence between the specification and the reference implementation | open (§2 connectors) |
+| 3 | No known divergence between the specification and the reference implementation | **met** — §2's connector-transport requirement was withdrawn |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
 | 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open, and it is time rather than work |
 

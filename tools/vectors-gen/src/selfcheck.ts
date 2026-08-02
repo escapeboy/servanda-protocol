@@ -31,6 +31,7 @@ import {
   fromHex,
 } from './crypto.js';
 import { verifyChain } from './transitions.js';
+import { decideVisibility } from './visibility.js';
 import { evaluateRequest } from './recovery.js';
 import { DOMAIN_TAG, domainSeparated, edgeId } from './protocol.js';
 import {
@@ -758,6 +759,52 @@ console.log('11. §6.6 recovery proof-of-possession (#37)');
   );
   check(!!bare && !bare.expected.accepted, 'recovery: a bare rotation is REFUSED');
   console.log(`   ${v.cases.length} recovery cases replayed`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('12. §5.3 visibility matrix (M-4)');
+// ---------------------------------------------------------------------------
+{
+  const v = readVector('visibility/matrix.json');
+  for (const c of v.cases) {
+    // Re-decided from the inputs, never copied from the file.
+    const got = decideVisibility(c.input);
+    check(got.serve === c.expected.serve, `visibility/${c.name}: serve`);
+    check(
+      JSON.stringify(got) === JSON.stringify(c.expected),
+      `visibility/${c.name}: the whole grant, not just its verdict`,
+    );
+  }
+
+  // This family's expectations are COMPUTED, so re-running the same function over the same inputs
+  // proves only that the file was written by it. These checks are what the family is actually
+  // held to: shape, not agreement-with-itself.
+  const rules = new Set(v.cases.map((c: any) => c.rule));
+  for (const rule of ['M-4a', 'M-4b', 'M-4c']) {
+    check(rules.has(rule), `visibility: ${rule} has at least one case`);
+  }
+  check(
+    v.cases.some((c: any) => c.expected.serve) && v.cases.some((c: any) => !c.expected.serve),
+    'visibility: the family exercises both outcomes',
+  );
+
+  // M-4b by name, because it is the rule the family exists for and the one an implementation is
+  // most likely to get wrong in the permissive direction: a valid membership, no publish, refused.
+  const m4b = v.cases.find((c: any) => c.name === 'a-scope-member-is-refused-an-UNPUBLISHED-edge');
+  check(!!m4b, 'visibility: the membership-without-publish case is present');
+  check(
+    !!m4b && m4b.input.attestations.length === 1 && m4b.input.publishes.length === 0,
+    'visibility: that case really carries a membership and really carries no publish',
+  );
+  check(!!m4b && !m4b.expected.serve, 'visibility: membership alone is REFUSED');
+
+  // And its positive twin, so the refusal above is not satisfied by refusing everything.
+  const served = v.cases.find((c: any) => c.name === 'a-scope-member-is-served-a-published-edge');
+  check(
+    !!served && served.expected.serve && served.input.attestations.length === 1,
+    'visibility: the same member IS served once the edge is published',
+  );
+  console.log(`   ${v.cases.length} visibility cases re-decided`);
 }
 
 // ---------------------------------------------------------------------------

@@ -161,7 +161,21 @@ const ADAPTERS = {
     name: c.name,
     op: 'verify_transitions',
     input: { edge: c.edge, assertions: c.assertions },
-    pins: [pin('outcomes', c.expected_outcomes), pin('final_state', c.expected_final_state)],
+    pins: [
+      pin('outcomes', c.expected_outcomes),
+      pin('final_state', c.expected_final_state),
+      // §4.7 / M-8 / M-9. Asked of every case, not only the collective ones: an implementation
+      // that never computes the flag answers `false` everywhere and would pass a check that
+      // only looked where `true` was expected.
+      pin('unverifiable', c.expected_unverifiable),
+    ],
+  })),
+
+  visibility: (doc) => doc.cases.map((c) => ({
+    name: c.name,
+    op: 'may_serve_edge',
+    input: c.input,
+    pins: expectedPins(c.expected),
   })),
 
   'addressing-inbox': (doc) => doc.cases.map((c) => ({
@@ -262,6 +276,7 @@ const FILES = {
   'addressing-inbox': 'addressing/inbox-records.json',
   'addressing-oob': 'addressing/oob-bootstrap.json',
   recovery: 'recovery/proof-of-possession.json',
+  visibility: 'visibility/matrix.json',
   'node-surface-actions': 'node-surface/actions.json',
   'node-surface-act-tool': 'node-surface/act-tool.json',
   'node-surface-brief-slots': 'node-surface/brief-slots.json',

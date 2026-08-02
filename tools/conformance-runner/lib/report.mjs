@@ -25,8 +25,19 @@ export function computeLevels(levelsDoc, results, { filtered = false } = {}) {
     const failed = cases.filter((c) => !c.pass);
     const advisory = (level.advisory ?? []).flatMap((f) => byFamily.get(f) ?? []);
 
+    // A required family that produced NO results is not a family that passed. `?? []` above
+    // made an absent family contribute zero cases and zero failures, so a level whose
+    // requirements named a family the loader does not know graded `pass` on the strength of
+    // never having run it. That is the same shape as every other check in this project that
+    // could not fail, and it was reachable by a one-line edit to levels.json — which is how it
+    // was found: `visibility` was required here before the loader knew the file, and nothing
+    // objected.
+    const missing = filtered ? [] : families.filter((f) => !byFamily.has(f));
+
     let verdict;
-    if (filtered) {
+    if (missing.length > 0) {
+      verdict = 'not-assessable';
+    } else if (filtered) {
       // --only exists for debugging one family. Grading a level from a subset of its
       // families would let anyone mint a green verdict by naming the families they pass,
       // which is worse than no runner at all.
@@ -55,7 +66,14 @@ export function computeLevels(levelsDoc, results, { filtered = false } = {}) {
         total: advisory.length,
         failed: advisory.filter((c) => !c.pass).map((c) => c.id),
       },
-      unreachable: filtered
+      unreachable: missing.length > 0
+        ? [
+            `required famil${missing.length === 1 ? 'y' : 'ies'} ${missing.join(', ')} produced no ` +
+              'results, so this level was not graded. A required family that did not run is not a ' +
+              'family that passed.',
+            ...(level.unreachable ?? []),
+          ]
+        : filtered
         ? ['the run was filtered with --only, so no level was graded. Remove --only to get a verdict.']
         : level.unreachable ?? [],
     };
