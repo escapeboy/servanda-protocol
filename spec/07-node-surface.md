@@ -37,7 +37,30 @@ Serves both inbound proposals and the local extraction-confirmation queue. Every
 ```
 `act` signs one assertion against one edge, as the calling persona, and is the only tool that does. The node MUST verify the resulting assertion against the §4.3 transition table before recording it and MUST reject the call rather than record an invalid assertion (M-14). `done` requires the caller to be the edge's `owner` and `evidence_hash` to be non-null; `release` requires the caller to be `owed_to` and `evidence_hash` to be null (§4.3). A node MUST NOT accept an `act` call from a persona that is not a party to the edge (M-3).
 
-**A refusal MUST name its reason from the §4.3 vocabulary, not a narrower one.** v0.1 fixed seven `rejection_reason` values while the transition table produced fifteen, so eight distinct refusals — "the edge is over", "you already signed this one", "the edge object is malformed" — reached the caller as the single word `illegal-source-state`. A node MUST report `terminal-state-reached` and `malformed-edge-acceptance-window` under their own names; the remaining table reasons MAY still be reported as `illegal-source-state`, which is truthful for them.
+**A refusal MUST name its reason from the §4.3 vocabulary, not a narrower one.** v0.1 fixed seven `rejection_reason` values while the transition table produced fifteen, so eight distinct refusals — "the edge is over", "you already signed this one", "the edge object is malformed" — reached the caller as the single word `illegal-source-state`. **The §4.3 vocabulary, and the projection onto §7.** §4.3 produces one reason per rejected
+assertion; §7's `act` reports a narrower set, because a caller can act on fewer distinctions than a
+verifier makes. The mapping is normative and is this:
+
+| §4.3 reason | `act` reports |
+|---|---|
+| `wrong-signer-for-transition` | `wrong-role-for-act` |
+| `signer-not-a-party` | `not-a-party` |
+| `evidence-hash-required`, `evidence-hash-required-for-owner-closure` | `evidence-hash-required` |
+| `acceptance-window-not-elapsed` | `acceptance-window-not-elapsed` |
+| `terminal-state-reached` | `terminal-state-reached` |
+| `malformed-edge-acceptance-window` | `malformed-edge-acceptance-window` |
+| everything else | `illegal-source-state` |
+
+**Two names collide across the two sets and mean different things, deliberately.** §4.3
+distinguishes `evidence-hash-required-for-owner-closure` from the general case because a verifier
+replaying a chain needs to know which row rejected it; a caller of `act` needs only to be told to
+supply evidence, and telling them *which row* would be telling them about a transition table they
+did not ask about. An implementation that reports the §4.3 name through `act` is wrong, and one
+that reports the §7 name in a chain verification is wrong the other way. Until v0.2 this mapping
+lived only in the vectors, which is how an implementer could produce a defensible name for every
+case and still fail.
+
+A node MUST report `terminal-state-reached` and `malformed-edge-acceptance-window` under their own names; the remaining table reasons MAY still be reported as `illegal-source-state`, which is truthful for them.
 
     An earlier draft of this revision also required `duplicate-assertion-by-same-party`. **It is unreachable through `act` and the requirement was withdrawn**: `act` performs only `done` and `release`, and a repeat of either arrives at an edge that the first one already moved to a terminal state, so the caller is told `terminal-state-reached` before duplication is ever considered. A node MAY still report it where the reason does arise — an assertion arriving over §6.2, where the chain is replayed rather than extended. A tool whose contract is to refuse owes the caller a reason it can act on.
 
@@ -61,6 +84,26 @@ Serves both inbound proposals and the local extraction-confirmation queue. Every
 
 In v0.1 `counterparty` was a bare string and the two were indistinguishable, so a conforming client could satisfy M-12 only by suppressing both — destroying the offline case — or neither. Every client therefore rendered names at every level, and M-12's client half was unenforceable rather than merely untested. `origin` is what makes it decidable.
 
+**The `actions` array is ORDERED, and the order is normative.** A client renders it as given, and
+"which act leads" is a decision about what a person sees first — too consequential to be left to a
+map's iteration order. The order is:
+
+`done` · `release` · `confirm` · `dismiss` · `ping` · `supersede` · `delegate`
+
+It is not the order the `act` vocabulary is declared in, and it is not alphabetical: it is
+most-consequential-first. Acts that end a promise come before acts that continue it, and acts that
+sign come before acts that only propose. Until v0.2 this was pinned by the vectors and by nothing
+else, so an implementer who read §7 and produced a different order failed cases the specification
+gave them no way to anticipate.
+
+**`ping` is advertised where the viewer is waiting on the other party and no timer is already
+running.** That is the whole rule, and v0.1 stated none — §7 said only that `ping` "is not a
+transition at all", which says what it is not and leaves an implementer to guess where it belongs.
+It resolves to exactly two places: `(proposed, owner)`, where the owner waits for a confirmation
+that may never come, and `(open, owed_to)`, where the party owed waits for delivery. It is NOT
+advertised at `pending-acceptance`, where a window is already running and a nudge cannot change
+the outcome, nor at `disputed`, where §4.4's exits govern and a nudge is noise on a deadlock.
+
 `view:"pending"` lists what is awaiting a decision by this persona: inbound `proposed` edges and the local extraction-confirmation queue — exactly the items `confirm` takes as its `id`. It is a view rather than a read mode on `confirm` because it is a list of items like every other view here, and a tool that both reads and writes gives a client two contracts under one name.
 
 ## brief
@@ -76,7 +119,9 @@ In v0.1 `counterparty` was a bare string and the two were indistinguishable, so 
 ## Conformance notes
 - Tools MUST NOT accept free-text that bypasses the §3.4 extraction rules.
 - `commit` records the promise of the calling persona. It takes no `owner` input: the owner is the persona resolved from `persona` (or the active persona), always, so recording another party's promise as theirs is impossible by construction rather than merely forbidden (M-1). The correct object for "they said they would" is `expect` (§3.3). A node MUST reject a `commit` call carrying an `owner` member rather than ignoring it, and the rejection MUST cite M-1: silently discarding the member would leave a client believing it had recorded someone else's promise. This applies whatever value the member carries.
-- `actions` describes what this person may do to this item *now*: a node MUST omit any act whose §4.3 row does not authorize the requesting persona to sign it in the item's current state, and MUST NOT list any act for an item in a terminal state. The array is therefore a function of the item's state and the caller's role, not a constant.
+- `actions` describes what this person may do to this item *now*: a node MUST omit any act whose §4.3 row does not authorize the requesting persona to **sign** it in the item's current state.
+
+  **The gate is signing, and it reaches only acts bound to a tool.** An act whose `tool` is `null` produces no assertion, so there is no signature for the table to authorize or forbid — it is an affordance the client may offer, and M-20's other half is what governs it: a node MUST NOT bind it to a tool call that signs nothing, which is exactly why it says `null` instead of pointing at a plausible-looking tool. This is why `supersede` and `delegate` are advertised at `pending-acceptance`, where §4.3 has no row for them: proposing to replace a live promise is meaningful while it is live, and proposing is not asserting. An implementation reading the earlier wording concluded the opposite and omitted them, and MUST NOT list any act for an item in a terminal state. The array is therefore a function of the item's state and the caller's role, not a constant.
 - `tool` names the §7 tool that performs the act, or is `null` where this specification defines none. In v0 `tool` is `"act"` for `done` and `release`, and `null` for `supersede`, `delegate` and `ping`: `supersede` and `delegate` are supersessions (§4.5) requiring signatures across two edges, which no single tool call completes, and `ping` is not a transition at all — it produces no assertion and changes no state. A client MUST NOT invoke a tool of its own devising for an act whose `tool` is `null`, and MUST NOT present such an act as though it had been performed. A client MAY show that the act exists and is not yet invocable.
 - `args` is the input object the client passes to `tool` verbatim. Where `tool` is `null`, `args` MUST be `{}`.
 - An act is named by `act`, drawn from one closed vocabulary shared by both list surfaces: `done`, `release`, `supersede`, `delegate`, `ping`, `confirm`, `dismiss`, `propose`. The same `{act, tool, args}` shape appears in `open_loops[].actions` and in `brief.slots[].primary_action`; a node MUST NOT describe an act differently on the two surfaces.
