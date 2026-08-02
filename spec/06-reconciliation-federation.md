@@ -6,6 +6,12 @@ Wire messages are transport-agnostic signed JSON. v0 defines two transports:
 - **git**: a shared repository; messages are files under `servanda/{edge_id}/{seq}-{type}.json`; sync = fetch/push. Suits team scopes (self-hosted, offline-tolerant).
 - **hub**: HTTPS relay. `POST /servanda/v0/deliver` with an encrypted envelope; `GET /servanda/v0/inbox?persona=...` (authenticated by persona signature challenge). Hubs are discovered via the domain anchor (§1.5).
 
+  **The challenge signature MUST name the hub it is for, inside the signed preimage**, and a hub MUST refuse an authentication naming any hub but itself. The signed object is `{v, type: "inbox_auth", persona, audience, challenge, issued_at, sig}`, where `audience` is the hub's own base URL as the persona's §6.7 record names it.
+
+  Without `audience` the signature is a bearer token valid at **every** hub at once, and §6.7's ordered hub list — which exists so a persona can be reachable when one hub is down — becomes the attack surface. One compromised hub in that list drains the persona's queue at all the others: it fetches an honest hub's outstanding challenge (a challenge is mintable by anyone, since it is issued before authentication by construction), serves it to the persona as its own, collects the signature, and replays it. The honest hub sees its own nonce and a valid signature by the persona it names, and hands over the queue. Everything §6.3 protects survives — the attacker holds ciphertext it cannot open — but "hubs MUST deliver only to the persona" does not, and the recipient, sizes and timings of the whole retained queue are exactly the metadata §6.3 does not encrypt.
+
+  A challenge is public by construction and is not a secret; `audience` is what makes the SIGNATURE non-transferable, which is the property that was missing.
+
 ## 6.2 Message types
 
 `propose` (edge + proposed assertion) · `assert` (any subsequent assertion) · `publish`/`unpublish` · `attestation`/`revocation`/`rotation` · `recon_request`/`recon_response` (6.4) · `recover_request`/`recover_response` (6.6)
