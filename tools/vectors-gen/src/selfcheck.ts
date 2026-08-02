@@ -218,10 +218,16 @@ for (const [rel, kind] of [
   const v = readVector(rel);
   for (const c of v.cases) {
     // §4.1 as resolved: the edge_id is recomputed from the four values, domain-tagged.
+    //
+    // One case is exempt, and it is exempt because it IS this rule: `edge-id-does-not-bind-body`
+    // carries an edge whose identifier deliberately does not digest its body, so that the suite
+    // says out loud what a node must do with one. Naming it rather than testing a property of it
+    // keeps the exemption to exactly one case — a predicate would quietly excuse the next one.
     const e = c.edge as Edge;
+    const bound = edgeId(e.commitment_hash, e.owner, e.owed_to, e.proposed_at) === e.edge_id;
     check(
-      edgeId(e.commitment_hash, e.owner, e.owed_to, e.proposed_at) === e.edge_id,
-      `${kind}/${c.name}: edge_id recomputes from its domain-tagged preimage`,
+      c.name === 'edge-id-does-not-bind-its-body' ? !bound : bound,
+      `${kind}/${c.name}: edge_id binds its body as the case declares`,
     );
     check(
       sha256Hex(

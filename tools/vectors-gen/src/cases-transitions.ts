@@ -334,9 +334,156 @@ export const VALID_CASES: TransitionCase[] = [
     expected: [null, null, null, null],
     expectedFinalState: 'superseded',
   },
+  {
+    name: 'dispute-from-pending-acceptance',
+    description:
+      '§4.3 "pending-acceptance | disputed | either party, `evidence_hash` REQUIRED". This is ' +
+      'the one row besides its two closures that `pending-acceptance` has, and it is pinned ' +
+      'positively so that the three negatives in the invalid set cannot be satisfied by a ' +
+      'verifier that refuses everything from that state. §4.3: the dispute cancels the window.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'disputed',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+        evidence_hash: evidenceHash('the tests do not run'),
+      }),
+    ],
+    expected: [null, null, null, null],
+    expectedFinalState: 'disputed',
+  },
 ];
 
 export const INVALID_CASES: TransitionCase[] = [
+  {
+    name: 'edge-id-does-not-bind-its-body',
+    description:
+      '§4.1: "A node MUST bind an `edge_id` to the first edge body it accepts for that ' +
+      'identifier." The identifier IS the digest of four of the body’s members, so an edge whose ' +
+      '`edge_id` is not that digest is not an edge — it is a chain filed under a name its sender ' +
+      'chose. Because an assertion chain is keyed by `edge_id`, a stranger who proposes a ' +
+      'perfectly self-consistent edge under somebody else’s identifier gets their assertion ' +
+      'appended to somebody else’s chain; the transition table will refuse it on every later ' +
+      'read, but it is in the chain, so §6.4 — whose whole guarantee is that both sides see the ' +
+      'same chain — can never converge on that edge again. The whole edge is refused, so every ' +
+      'assertion in the case is rejected, not merely the offending one: there is nothing for an ' +
+      'assertion to be valid ABOUT. This vector exists because nothing in the suite recomputed ' +
+      'an `edge_id`, which is how the rule went unimplemented in two codebases at once.',
+    edge: { ...EDGE_ACCEPTANCE, edge_id: FOREIGN_EDGE_ID },
+    assertions: [
+      makeAssertion({
+        edge_id: FOREIGN_EDGE_ID,
+        state: 'proposed',
+        asserted_at: T_PROPOSED,
+        signer: ALICE,
+      }),
+      makeAssertion({
+        edge_id: FOREIGN_EDGE_ID,
+        state: 'confirmed',
+        asserted_at: T_CONFIRMED,
+        signer: BOB,
+      }),
+    ],
+    expected: ['edge-id-does-not-bind-body', 'edge-id-does-not-bind-body'],
+    expectedFinalState: 'none',
+  },
+  {
+    name: 'expired-from-pending-acceptance',
+    description:
+      '§4.3 gives `expired` an `open` source row and no `pending-acceptance` row, and this ' +
+      'is the case that shows the distinction is not bookkeeping. `expired` is terminal and ' +
+      'either party may sign it once `due` has passed, so from `pending-acceptance` the ' +
+      'creditor could answer the debtor’s evidence assertion by ending the edge outright — ' +
+      'no closure recorded, no dispute to answer, nothing further assertable. That inverts ' +
+      '§4.4, whose acceptance window exists so that the creditor’s SILENCE becomes consent. ' +
+      'Two implementations written independently both folded `pending-acceptance` into an ' +
+      '“open family” and grew this row, and no vector contradicted either of them.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'expired',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+      }),
+    ],
+    expected: [null, null, null, 'illegal-source-state'],
+    expectedFinalState: 'pending-acceptance',
+  },
+  {
+    name: 'released-from-pending-acceptance',
+    description:
+      '§4.3 `open | released | owed_to alone`. Forgiveness after the owner has already filed ' +
+      'evidence is not a transition the table has: that chain is one signature away from ' +
+      '`closed`, and `released` records a different fact about the same edge.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'released',
+        asserted_at: T_ACCEPT,
+        signer: BOB,
+      }),
+    ],
+    expected: [null, null, null, 'illegal-source-state'],
+    expectedFinalState: 'pending-acceptance',
+  },
+  {
+    name: 'superseded-from-pending-acceptance',
+    description:
+      '§4.3 `open | superseded | owner + owed_to`. Supersession replaces a live commitment; ' +
+      'an edge whose evidence is filed and whose window is running is not one, and §4.5’s ' +
+      'successor would inherit a promise already performed.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [
+      proposed(EDGE_ACCEPTANCE),
+      confirmed(EDGE_ACCEPTANCE),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'closed',
+        asserted_at: T_EVIDENCE,
+        signer: ALICE,
+        evidence_hash: EV,
+      }),
+      makeAssertion({
+        edge_id: EDGE_ACCEPTANCE.edge_id,
+        state: 'superseded',
+        asserted_at: T_ACCEPT,
+        signer: ALICE,
+      }),
+    ],
+    expected: [null, null, null, 'illegal-source-state'],
+    expectedFinalState: 'pending-acceptance',
+  },
   {
     name: 'owner-backdates-to-manufacture-an-elapsed-acceptance-window',
     description:

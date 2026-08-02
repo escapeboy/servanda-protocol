@@ -11,6 +11,7 @@
  */
 
 import { verifyObject, fromHex } from './crypto.js';
+import { edgeId } from './protocol.js';
 import type { Assertion, AssertionState, Edge } from './protocol.js';
 import type { Json } from './jcs.js';
 
@@ -30,6 +31,7 @@ export type RejectionReason =
   | 'implicit-transition-not-assertable'
   | 'duplicate-assertion-by-same-party'
   | 'malformed-edge-acceptance-window'
+  | 'edge-id-does-not-bind-body'
   /** v0.2 (#38): `asserted_at` is non-decreasing per signer within a chain. */
   | 'asserted-at-before-signers-previous';
 
@@ -146,6 +148,16 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
   if (previous !== undefined && Date.parse(a.asserted_at) < Date.parse(previous)) {
     return 'asserted-at-before-signers-previous';
   }
+  // §4.1: the identifier must digest the body it names. Checked before every other rule about
+  // this edge, because until it holds, "the body" is whatever its sender wanted the rules to
+  // read — the four bound members include both parties, so an unbound edge can satisfy every
+  // signer check on its own terms while its chain is filed under somebody else's identifier.
+  if (
+    edgeId(edge.commitment_hash, edge.owner, edge.owed_to, edge.proposed_at) !== edge.edge_id
+  ) {
+    return 'edge-id-does-not-bind-body';
+  }
+
   // §4.1 (as resolved): acceptance_window is non-null iff closure_policy is on-acceptance.
   // There is no default. A malformed edge accepts no assertions at all — not merely the
   // closure ones — because the member decides when silence becomes consent.
@@ -192,10 +204,13 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
     case 'open':
       return 'implicit-transition-not-assertable';
 
+    // §4.3 gives `released`, `expired` and `superseded` an `open` source row and no
+    // `pending-acceptance` row. Reading `pending-acceptance` as part of an "open family" — which
+    // this verifier and the reference implementation both did, independently and identically —
+    // invents three transitions the table does not have. The equivalence §4.3 actually licenses
+    // is `confirmed` ≡ `open`, and `st.state` has already collapsed that.
     case 'released':
-      if (st.state !== 'open' && st.state !== 'pending-acceptance') {
-        return 'illegal-source-state';
-      }
+      if (st.state !== 'open') return 'illegal-source-state';
       if (!isOwedTo) return 'wrong-signer-for-transition'; // §4.3: "owed_to alone"
       return null;
 
@@ -211,13 +226,16 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
         }
         return null;
       }
-      if (st.state !== 'open' && st.state !== 'pending-acceptance') {
-        return 'illegal-source-state';
-      }
+      // The damaging one: `expired` is terminal and unilateral once `due` has passed, so from
+      // `pending-acceptance` it let the creditor answer the debtor's evidence assertion by
+      // ending the edge outright — the §4.4 acceptance window read backwards.
+      if (st.state !== 'open') return 'illegal-source-state';
       if (edge.due === null) return 'due-is-null'; // §4.3 "only if due non-null"
       if (Date.parse(a.asserted_at) < Date.parse(edge.due)) return 'expiry-before-due';
       return null;
 
+    // The one row `pending-acceptance` genuinely has besides its two closures: §4.3
+    // "pending-acceptance | disputed | either party, `evidence_hash` REQUIRED".
     case 'disputed':
       if (st.state !== 'open' && st.state !== 'pending-acceptance') {
         return 'illegal-source-state';
@@ -226,11 +244,7 @@ function evaluate(edge: Edge, a: Assertion, st: MutableState): RejectionReason |
       return null;
 
     case 'superseded':
-      if (
-        st.state !== 'open' &&
-        st.state !== 'pending-acceptance' &&
-        st.state !== 'disputed'
-      ) {
+      if (st.state !== 'open' && st.state !== 'disputed') {
         return 'illegal-source-state';
       }
       if (st.supersededBy.has(a.by)) return 'duplicate-assertion-by-same-party';
