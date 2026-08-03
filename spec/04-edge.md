@@ -80,7 +80,7 @@ The edge's current state = the latest valid assertion per the transition table. 
 | open | disputed | either party, `evidence_hash` REQUIRED | resolution semantics: §4.4 |
 | disputed | superseded/closed | both parties | agreement |
 | disputed | expired | either party, only once `dispute_window` has elapsed | **not a verdict** — §4.4 |
-| open | contested-closure | — (computed; no signer) | two parties took **different** unilateral exits concurrently — §4.6 |
+| open | contested-closure | — (computed; no signer) | two parties took **different** unilateral exits concurrently — §4.4 |
 | contested-closure | closed | owner + owed_to (both assert) | agreement, exactly as from `disputed` |
 | contested-closure | superseded | owner + owed_to (both assert) | agreement |
 | contested-closure | expired | either party, only once `dispute_window` has elapsed | **not a verdict** — §4.4, the same exit `disputed` has |
@@ -136,13 +136,23 @@ Three properties make this the resolution rather than one of the alternatives, a
 2. **Nothing signed is discarded.** A deterministic tie-break — lowest hash, earliest timestamp — also converges, and does so by voiding one party's signed act in a protocol whose whole premise is that a signed act stands. It would also decide by `asserted_at`, a value written by the party it judges.
 3. **It is unverifiable in the sense of M-8**, and a node MUST NOT auto-escalate on it. The edge is not resolved; two people disagree about how it ended, and the protocol's job here is to make that visible rather than to pick a winner — the same position §4.4 takes on disputes and §4.1 takes on divergent edge bodies.
 
-`contested-closure` is NOT terminal, and it has **all three** of the exits `disputed` has: both parties assert `closed`, both assert `superseded`, or — once `dispute_window` has elapsed from the contest — either party alone asserts `expired`.
+`contested-closure` is NOT terminal, and it has **all three** of the exits `disputed` has: both parties assert `closed`, both assert `superseded`, or — once `dispute_window` has elapsed from **the later of the two contesting assertions' `asserted_at` values** — either party alone asserts `expired`.
+
+The later of the two, stated rather than left to "from the contest", because a contest is TWO assertions with two timestamps and that phrase names neither. Two nodes reading it differently compute different answers to "may this party expire yet", so the same `expire` is legal on one and refused on the other — a §6.4 convergence failure produced by a sentence, in the state that exists precisely because §4.4 refused to let honest nodes diverge. The later value is also the first exit's, since the concurrency test admits a contesting assertion only if it is dated at or before the one it contests.
 
 The third one is not optional, and the argument is the one this section already makes two paragraphs above. Without it both resolutions require both parties, so reaching a contest becomes a unilateral act that freezes an edge permanently, and a counterparty who contests and then goes silent leaves an owner who may have genuinely fulfilled the commitment holding an edge that can never close, never expire and never be superseded. **A state two people can enter by accident and cannot leave alone is a worse trap than the divergence it replaces.**
 
 It is worse here than in the `disputed` case if the escape is missing, which is why this is stated rather than left to be inferred: `disputed` costs its author an `evidence_hash`, and a contest costs nothing but a timestamp. An implementation that gives `disputed` the third exit and withholds it here has built the stronger weapon and handed it out for free.
 
-**Only a concurrent act contests.** An assertion whose `asserted_at` is LATER than the exit it conflicts with MUST NOT produce `contested-closure`; it is judged by the ordinary rows, which is to say discarded. An act dated after the one it conflicts with could have been a response to it, and §4.3 already says what the answers to an exit are — accept it, or dispute it. This comparison is between two self-written timestamps, which §4.3 otherwise distrusts, and it is sound here for a specific reason: backdating buys nothing. A counterparty who wants to stop a closure already has `disputed`, legal from `pending-acceptance`, with the same blocking effect and an `evidence_hash` attached. No position is reachable by lying that is not reachable honestly.
+**Only a concurrent act contests.** An assertion whose `asserted_at` is LATER than the exit it conflicts with MUST NOT produce `contested-closure`; it is judged by the ordinary rows, which is to say discarded. An act dated after the one it conflicts with could have been a response to it, and §4.3 already says what the answers to an exit are — accept it, or dispute it. This comparison is between two self-written timestamps, which §4.3 otherwise distrusts.
+
+**What backdating buys, stated plainly, because an earlier revision of this paragraph said it buys nothing and that is no longer true.** The old argument was that a counterparty who wants to stop a closure already has `disputed` — legal from `pending-acceptance`, same blocking effect, `evidence_hash` attached — so no position was reachable by lying that was not reachable honestly. That held while a contest FROZE the edge. Now that `expire` is invocable (§7), both routes reach a terminal `expired` after `dispute_window`, so the two are equivalent in outcome and no longer equivalent in cost.
+
+Concretely: `release` is `owed_to`'s to take alone at any moment, so `owed_to` can convert any owner's `closed` into a `contested-closure` by dating a `released` at or before it, wait out the window, and sign `expire`. The owner's genuine closure never stands; the edge ends `expired`, which decides nothing — and "decides nothing" is a better outcome for the party who owed than a recorded `closed` is. **What backdating buys is the same result for a timestamp instead of an `evidence_hash`.**
+
+This paragraph already observed the asymmetry — "`disputed` costs its author an `evidence_hash`, and a contest costs nothing but a timestamp" — and read it only as an argument for giving the contest an escape hatch. It is equally an argument that the contest is now the cheaper weapon, and one sentence was supporting both conclusions while only one was drawn.
+
+Recorded rather than closed. The remedy is not role-gating `expire`: the cheap party here is `owed_to`, who is one of the two any gate must include, and gating it puts back the permanent freeze §4.4 exists to prevent. What is left open is whether a contest should cost its author evidence, as `disputed` does — a v1.x question, and one nobody should answer in the same afternoon they found it.
 
 ## 4.5 Supersession (ADR-0010)
 

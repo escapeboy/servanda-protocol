@@ -112,8 +112,8 @@ of its own.
 | `verify_inbox_record` | `{record, known_keys}` | `{canonical, accepted, rejection_reason, actual_signer}` |
 | `oob_bootstrap` | `{message}` | `{canonical, payload_b64url, url, signature_verifies}` |
 | `recover_request` | `{request}` | `{accepted, reason}` |
-| `advertise_actions` | `{edge, assertions, viewer, window_elapsed}` | `{effective_state, actions}` |
-| `act` | `{edge, assertions, effective_state, call, window_elapsed}` | `{accepted, rejection_reason, asserts}` |
+| `advertise_actions` | `{edge, assertions, viewer, window_elapsed, dispute_window_elapsed}` | `{effective_state, actions}` |
+| `act` | `{edge, assertions, effective_state, call, window_elapsed, dispute_window_elapsed}` | `{accepted, rejection_reason, asserts}` |
 | `judge_brief_slot` | `{slot}` | `{valid, rejection_reason}` |
 | `grade_verification` | `{evidence}` | `{level, display_name, name_bearing, counterparty}` |
 
@@ -142,6 +142,17 @@ Notes on the shapes, where the shape encodes a rule:
   earlier families and relying on `derivation` being asked before `signatures`. That is an
   ordering dependency this document never stated and no implementer should have to discover.
   Supplying the keys never rescues a bad signature; it only lets a refusal say something true.
+
+- **`dispute_window_elapsed` is a SECOND window and not the same one.** `window_elapsed` is
+  §4.3's acceptance window, on `pending-acceptance`. `dispute_window_elapsed` is §4.4's, on
+  `disputed` and `contested-closure`, and it is what gates the `expire` act — the third exit
+  either party may take alone once the deadlock has stood long enough. They differ in length and
+  they never apply to the same state, so deriving one from the other gets both wrong.
+
+  It arrived with the `expire` cases, and it arrived late: the vectors were written and pinned
+  before this line existed, which made them unpassable by construction — an implementation was
+  being asked to decide on an input the runner never handed it. Caught by the independent
+  implementation failing three cases it had no way to pass.
 
 - **`advertise_actions`** and **`act`** receive `window_elapsed` as input. Generation is
   clockless and so is the runner: an IUT that reads a clock here is answering a different

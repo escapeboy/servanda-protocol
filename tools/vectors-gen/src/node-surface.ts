@@ -22,6 +22,7 @@ import type { EffectiveState } from './transitions.js';
 export type Act =
   | 'done'
   | 'release'
+  | 'expire'
   | 'supersede'
   | 'delegate'
   | 'ping'
@@ -32,6 +33,7 @@ export type Act =
 export const ACT_VOCABULARY: Act[] = [
   'done',
   'release',
+  'expire',
   'supersede',
   'delegate',
   'ping',
@@ -51,6 +53,10 @@ export const ACT_VOCABULARY: Act[] = [
 export const ACT_TOOL: Record<Act, string | null> = {
   done: 'act',
   release: 'act',
+  // §4.4's third exit, bound at last. It is a single-signature assertion by a named party gated
+  // on `dispute_window` — the same shape as `release` — and calling its absence "time and not an
+  // act" left the escape §4.4 calls not-optional reachable in the table and through no tool.
+  expire: 'act',
   supersede: null,
   delegate: null,
   ping: null,
@@ -92,6 +98,8 @@ export function actionsFor(
   state: EffectiveState,
   persona: string,
   windowElapsed: boolean,
+  /** §4.4: whether `dispute_window` has run from the deadlock. A different window from the one above. */
+  disputeWindowElapsed = false,
 ): AdvertisedAction[] {
   const role = roleOf(edge, persona);
   // M-3: edges are strictly two-party. A non-party is offered nothing, ever.
@@ -143,15 +151,29 @@ export function actionsFor(
         : [advertise('supersede'), advertise('delegate')];
 
     case 'disputed':
-      // §4.4 as resolved: v0 has no arbitration. The only exits are mutual `closed` and
-      // mutual supersession, and neither is a single-call act, so only `supersede` is shown.
-      return [advertise('supersede')];
+      // §4.4 as resolved: v0 has no arbitration. The two mutual exits are not single-call acts,
+      // so only `supersede` is shown until `dispute_window` has run — after which `expire` is,
+      // by either party. Same rule as `contested-closure` below, and the same reason.
+      // §7's normative order is most-consequential-first: `expire` ENDS the promise and SIGNS,
+      // `supersede` does neither. Emitted the other way round in the first revision, which is the
+      // defect the ordering paragraph exists to prevent.
+      return disputeWindowElapsed
+        ? [advertise('expire', { ...id, act: 'expire' }), advertise('supersede')]
+        : [advertise('supersede')];
 
     case 'contested-closure':
-      // §4.4: the same shape as `disputed`, and for the same reason. Both exits need both
-      // parties, so no single call performs one, and M-20 forbids advertising an act this
+      // §4.4: the same shape as `disputed`, and for the same reason. The two JOINT exits need
+      // both parties, so no single call performs one, and M-20 forbids advertising an act this
       // persona cannot sign into effect on its own.
-      return [advertise('supersede')];
+      //
+      // `expire` is the third exit and IS single-signature, by either party, once
+      // `dispute_window` has run — so it is advertised then and not before.
+      // §7's normative order is most-consequential-first: `expire` ENDS the promise and SIGNS,
+      // `supersede` does neither. Emitted the other way round in the first revision, which is the
+      // defect the ordering paragraph exists to prevent.
+      return disputeWindowElapsed
+        ? [advertise('expire', { ...id, act: 'expire' }), advertise('supersede')]
+        : [advertise('supersede')];
 
     // Terminal states carry no affordances at all (§7 conformance notes).
     case 'closed':
@@ -171,6 +193,7 @@ export type ActRejection =
   | 'act-not-bound-to-a-tool'
   | 'wrong-role-for-act'
   | 'illegal-source-state'
+  | 'dispute-window-not-elapsed'
   | 'evidence-hash-required'
   | 'evidence-hash-must-be-null'
   | 'acceptance-window-not-elapsed'
@@ -188,7 +211,7 @@ export interface ActOutcome {
   accepted: boolean;
   reason?: ActRejection;
   /** The assertion state the node would sign, when accepted. */
-  asserts?: 'closed' | 'released';
+  asserts?: 'closed' | 'released' | 'expired';
 }
 
 /**
@@ -207,6 +230,8 @@ export function evaluateAct(
   windowElapsed: boolean,
   /** The chain as it stands, so a repeat of the caller's own assertion is named as one. */
   chain: readonly { by: string; state: string }[] = [],
+  /** §4.4: whether `dispute_window` has run. Supplied, never clocked — generation is clockless. */
+  disputeWindowElapsed = false,
 ): ActOutcome {
   const role = roleOf(edge, caller);
   if (role === 'non-party') return { accepted: false, reason: 'not-a-party' };
@@ -238,6 +263,20 @@ export function evaluateAct(
       return { accepted: false, reason: 'acceptance-window-not-elapsed' };
     }
     return { accepted: true, asserts: 'closed' };
+  }
+
+  // §4.4's third exit. Neither role-gated nor in the open family: the escape from a deadlock has
+  // to reach whoever is trapped, and both parties are. Evidence is refused because §4.4 says the
+  // outcome names a window and never a verdict.
+  if (act === 'expire') {
+    if (state !== 'disputed' && state !== 'contested-closure') {
+      return { accepted: false, reason: 'illegal-source-state' };
+    }
+    if (evidenceHash !== null) return { accepted: false, reason: 'evidence-hash-must-be-null' };
+    // Named, not collapsed: "not yet" and "never" are different answers, and this is the one
+    // state from which `expire` is legal.
+    if (!disputeWindowElapsed) return { accepted: false, reason: 'dispute-window-not-elapsed' };
+    return { accepted: true, asserts: 'expired' };
   }
 
   // release — §4.3's one unilateral act: "owed_to alone", unconditional forgiveness.

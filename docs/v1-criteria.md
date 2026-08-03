@@ -217,6 +217,9 @@ diffing this table against `git log`, which is the only way it was ever going to
 | §4.7 `expected_unverifiable`, M-8 and M-9 covered | editorial-with-vectors | 2026-08-02 | — |
 | §5.3 visibility matrix, M-4 covered | editorial-with-vectors | 2026-08-02 | — |
 | §9.6 deferred past v1; external review removed as a gate | editorial | 2026-08-02 | — |
+| §7 `contested-closure` is live and advertises only `supersede` | normative-with-vectors | 2026-08-03 | 2026-08-17 |
+| §7 `open_loops` is ranked and reports `total` | normative | 2026-08-03 | 2026-08-17 |
+| §7 `expire` joins the act vocabulary; §4.4's third exit is bound to `act` | normative-with-vectors | 2026-08-03 | 2026-08-17 |
 
 **§6.1 landed with no vector, and `GOVERNANCE.md` says a normative PR MUST update `vectors/` in
 the same PR.** It is the one entry here that is not merely late to the register: the audience
@@ -224,6 +227,36 @@ binding is a wire-visible rule, a vector can pin it, and none does. Until one ex
 implementation may omit the check and pass the suite — which is `GOVERNANCE.md`'s own rule that an
 uncovered behaviour is not yet a conformance requirement, applied to the day's largest security
 fix. **Outstanding work, not bookkeeping.**
+
+**`expire` widens a CLOSED vocabulary, which is the heaviest kind of change here, and it is the
+one entry today that fixes a contradiction rather than a gap.** §4.4 argues at length that the
+third exit from `disputed` and `contested-closure` is *not optional* — "a state two people can
+enter by accident and cannot leave alone is a worse trap than the divergence it replaces" — while
+§7 offered no act that reaches it and described the absence as "time and not an act". It is not
+time: §4.3 and §4.4 both say a party *asserts* `expired`. So the escape one section calls
+mandatory was, at the surface the other section defines, unreachable.
+
+Found by the independent implementation, from the text alone, by asking what a trapped party is
+supposed to press. That is the second time this artefact has produced a finding of exactly this
+shape — the first was §1.7 rotation, correct in the transition table and refused on the wire — and
+it is the shape a reference implementation cannot find in itself, because the code and the spec
+were written by the same person on the same day and agree.
+
+**`open_loops` is the second entry with no vector, for the same structural reason and it should
+not be read as the same mistake.** §6.1 could be pinned and was not. This one *cannot* be pinned
+today: there is no `open_loops` op in `tools/conformance-runner/PROTOCOL.md` and no vector family
+for the tool at all — the suite reaches §7 through `advertise_actions`, `act`, `judge_brief_slot`
+and `grade_verification`, none of which returns a page of items. So "ranked, and `total` is the
+view's size" is a normative rule that no implementation can currently be failed for ignoring.
+
+Building that family is real work — a runner op, a `PROTOCOL.md` shape, a generator case set, and
+an independent implementation that has to grow a ranking to match. **Named here rather than done,
+and named as outstanding rather than as covered**, because the failure this document exists to
+prevent is a gate recorded as met with nothing behind it.
+
+The `contested-closure` row above is the shape this should have: the rule went into §7 and
+`node-surface/actions.json` gained both seats in the same change, which is why it is classed
+`normative-with-vectors`.
 
 None is constitutional: nothing above touches the thirteen README principles. The
 editorial-with-vectors rows carry no window by `GOVERNANCE.md`'s own rule — they add cases for

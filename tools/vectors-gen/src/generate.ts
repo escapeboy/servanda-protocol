@@ -896,7 +896,13 @@ function actTable() {
 export function buildNodeSurfaceActions() {
   const cases = ACTIONS_CASES.map((c) => {
     const chain = verifyChain(c.edge, c.assertions);
-    const actions = actionsFor(c.edge, chain.finalState, c.viewer.persona_id, c.window_elapsed);
+    const actions = actionsFor(
+      c.edge,
+      chain.finalState,
+      c.viewer.persona_id,
+      c.window_elapsed,
+      c.dispute_window_elapsed ?? false,
+    );
 
     // A case whose chain does not fully apply would silently test the wrong state.
     if (chain.rejectedCount !== 0) {
@@ -923,6 +929,7 @@ export function buildNodeSurfaceActions() {
       viewer: { ...c.viewer, role: roleOf(c.edge, c.viewer.persona_id) },
       effective_state: chain.finalState,
       window_elapsed: c.window_elapsed,
+      dispute_window_elapsed: c.dispute_window_elapsed ?? false,
       expected_actions: actions as unknown as Json,
       /** Every act NOT advertised here, so the negative half is explicit rather than implied. */
       must_not_advertise: ACT_VOCABULARY.filter((a) => !actions.some((x) => x.act === a)),
@@ -982,6 +989,7 @@ export function buildNodeSurfaceActTool() {
       c.evidence_hash,
       c.window_elapsed,
       c.assertions,
+      c.dispute_window_elapsed ?? false,
     );
     return {
       name: c.name,
@@ -995,6 +1003,7 @@ export function buildNodeSurfaceActTool() {
         input: { id: c.edge.edge_id, act: c.act, evidence_hash: c.evidence_hash },
       },
       window_elapsed: c.window_elapsed,
+      dispute_window_elapsed: c.dispute_window_elapsed ?? false,
       expected: {
         accepted: outcome.accepted,
         rejection_reason: outcome.accepted ? null : (outcome.reason ?? null),

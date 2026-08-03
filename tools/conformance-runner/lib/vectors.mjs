@@ -217,6 +217,7 @@ const ADAPTERS = {
       assertions: c.assertions,
       viewer: c.viewer,
       window_elapsed: c.window_elapsed,
+      dispute_window_elapsed: c.dispute_window_elapsed ?? false,
     },
     pins: [pin('effective_state', c.effective_state), pin('actions', c.expected_actions)],
     derived: [{
@@ -237,6 +238,7 @@ const ADAPTERS = {
       effective_state: c.effective_state,
       call: c.call,
       window_elapsed: c.window_elapsed,
+      dispute_window_elapsed: c.dispute_window_elapsed ?? false,
     },
     pins: expectedPins(c.expected),
   })),

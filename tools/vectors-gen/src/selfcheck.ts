@@ -419,6 +419,10 @@ console.log('9. Node-surface vectors replayed (§7; M-20, M-14)');
       chain.finalState,
       c.viewer.persona_id,
       c.window_elapsed,
+      // §4.4's window, read back from the vector like every other input. Omitting it here would
+      // make the replay disagree with the generator about a case the generator got right — the
+      // selfcheck's whole job is to notice that, and it did.
+      (c as { dispute_window_elapsed?: boolean }).dispute_window_elapsed ?? false,
     );
     check(
       JSON.stringify(got) === JSON.stringify(c.expected_actions),
@@ -528,6 +532,8 @@ console.log('9. Node-surface vectors replayed (§7; M-20, M-14)');
       c.call.input.act as Act,
       c.call.input.evidence_hash,
       c.window_elapsed,
+      [],
+      (c as { dispute_window_elapsed?: boolean }).dispute_window_elapsed ?? false,
     );
     check(outcome.accepted === c.expected.accepted, `act/${c.name}: accepted=${c.expected.accepted}`);
     const reason = outcome.accepted ? null : (outcome.reason ?? null);

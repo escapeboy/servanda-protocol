@@ -49,6 +49,27 @@ const releasedBy = (edge: Edge): Assertion =>
     signer: BOB,
   });
 
+/**
+ * The §6.4 contest: both parties exit `open` alone, at the same instant, neither having seen the
+ * other. `released` is dated AT the owner's evidence close, because only a CONCURRENT act
+ * contests — one dated later could have been a response, and §4.3 already says what the answer to
+ * an exit is.
+ */
+const concurrentRelease = (edge: Edge): Assertion =>
+  makeAssertion({
+    edge_id: edge.edge_id,
+    state: 'released',
+    asserted_at: T_EVIDENCE,
+    signer: BOB,
+  });
+
+const CONTESTED = (edge: Edge): Assertion[] => [
+  proposed(edge),
+  confirmed(edge),
+  ownerEvidenceClose(edge),
+  concurrentRelease(edge),
+];
+
 export interface ActionsCase {
   name: string;
   description: string;
@@ -58,6 +79,8 @@ export interface ActionsCase {
   viewer: { label: string; persona_id: string };
   /** Supplied, never clocked: whether `acceptance_window` has run out (§4.3). */
   window_elapsed: boolean;
+  /** §4.4: whether `dispute_window` has run from the deadlock. A DIFFERENT window. */
+  dispute_window_elapsed?: boolean;
 }
 
 const P_ALICE = { label: 'alice (owner)', persona_id: ALICE.personaId };
@@ -163,6 +186,75 @@ export const ACTIONS_CASES: ActionsCase[] = [
     window_elapsed: false,
   },
   {
+    name: 'contested-closure-owner',
+    description:
+      '§4.4: `contested-closure` is NOT terminal, and a node that treats it as one advertises ' +
+      'nothing to a person who has three exits. It is left the way `disputed` is left — both ' +
+      'parties, or not at all — so `supersede` is the only thing shown, and it is unbound. ' +
+      '**`done` is not advertised to the owner**, even though §4.3 gives them a `closed` row ' +
+      'here: that row needs BOTH parties, and §7 binds `done` to the owner alone, so the ' +
+      'counterparty has no advertised way to sign their half. An owner who signed would record ' +
+      'a closure that can never complete — the person is told their promise is closed and the ' +
+      'edge stays contested for ever. That is the failure M-20 exists to prevent, and it is the ' +
+      'same argument §7 already settled for `disputed`. The exit that ends this edge is ' +
+      '`expired`, which is time rather than an act.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    viewer: P_ALICE,
+    window_elapsed: false,
+  },
+  {
+    name: 'contested-closure-owed-to',
+    description:
+      'The same array from the other seat. Both parties reached this state by acting, both are ' +
+      'blocked on the other, and neither is offered more than the other — an asymmetry here ' +
+      'would say one of two legal acts was the wrong one.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    viewer: P_BOB,
+    window_elapsed: false,
+  },
+  {
+    name: 'contested-closure-owner-after-the-dispute-window',
+    description:
+      '§4.4 gives this state a THIRD exit — `expired`, by either party alone, once ' +
+      '`dispute_window` has run — and §7 binds it to `act` as `expire`. Before the window it is ' +
+      'not advertised (see `contested-closure-owner`); after it, it is, because a state two ' +
+      'people can enter by accident and cannot leave alone is a worse trap than the divergence ' +
+      'it replaces. It was reachable in the transition table and through no tool at all.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    viewer: P_ALICE,
+    window_elapsed: false,
+    dispute_window_elapsed: true,
+  },
+  {
+    name: 'contested-closure-owed-to-after-the-dispute-window',
+    description:
+      'The same, from the other seat, and the asymmetry that would matter if it were absent: ' +
+      '`done` is the owner’s and `release` is the party-owed’s, so an `expire` gated on role ' +
+      'would leave one of the two people trapped — and which one depends on who contested ' +
+      'first. §4.4 gates it on the window and on nothing else.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    viewer: P_BOB,
+    window_elapsed: false,
+    dispute_window_elapsed: true,
+  },
+  {
+    name: 'disputed-after-the-dispute-window',
+    description:
+      '`disputed` leaves the same way and on the same terms. §4.4 says so, and states that an ' +
+      'implementation which gives `disputed` the third exit and withholds it from ' +
+      '`contested-closure` "has built the stronger weapon and handed it out for free" — so ' +
+      'this pair is pinned together or neither is pinned at all.',
+    edge: EDGE_ACCEPTANCE,
+    assertions: [proposed(EDGE_ACCEPTANCE), confirmed(EDGE_ACCEPTANCE), disputedBy(EDGE_ACCEPTANCE)],
+    viewer: P_ALICE,
+    window_elapsed: false,
+    dispute_window_elapsed: true,
+  },
+  {
     name: 'terminal-released',
     description:
       'Terminal states carry no affordances at all. A node that keeps advertising `done` on a ' +
@@ -194,6 +286,8 @@ export interface ActCase {
   act: Act;
   evidence_hash: string | null;
   window_elapsed: boolean;
+  /** §4.4: whether `dispute_window` has run from the deadlock. A DIFFERENT window. */
+  dispute_window_elapsed?: boolean;
 }
 
 const openChain = (edge: Edge) => [proposed(edge), confirmed(edge)];
@@ -229,6 +323,83 @@ export const ACT_CASES: ActCase[] = [
     act: 'done',
     evidence_hash: EV,
     window_elapsed: true,
+  },
+  {
+    name: 'done-from-contested-closure-refused',
+    description:
+      '§7: "a node MUST refuse a `done` call from `contested-closure` with `illegal-source-state` ' +
+      'rather than recording a half-closure." The same argument as `done-from-disputed-refused` ' +
+      'and a DIFFERENT state, which is why it needs its own case: §4.3 does give ' +
+      '`contested-closure` a `closed` row and the owner IS one of its two signers, so an ' +
+      'implementation that consulted only the transition table would sign — the owner’s half of ' +
+      'a closure whose other half no advertised act can reach, because `done` is bound to the ' +
+      'owner alone. The edge would stay contested for ever while its owner had been told it was ' +
+      'closed. The exit that ends it is `expired`, which is time and not a member of the act ' +
+      'vocabulary at all.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    caller: P_ALICE,
+    act: 'done',
+    evidence_hash: EV,
+    window_elapsed: true,
+  },
+  {
+    name: 'release-from-contested-closure-refused',
+    description:
+      'The counterparty’s side of the same rule, and it is refused one step earlier: `release` ' +
+      'is `owed_to`’s act, but `contested-closure` has no `released` row at all, so this is ' +
+      '`illegal-source-state` and not `wrong-role-for-act`. Present because a node that refused ' +
+      'only the owner’s `done` would leave the counterparty a control that signs an assertion ' +
+      'the chain discards — the failure M-20 exists to prevent, arrived at from the other seat.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    caller: P_BOB,
+    act: 'release',
+    evidence_hash: null,
+    window_elapsed: true,
+  },
+  {
+    name: 'expire-from-contested-closure-after-the-window',
+    description:
+      '§4.4’s third exit, signed. Either party, no evidence, `expired`. This is the case whose ' +
+      'absence made the escape unreachable: `act` took `done|release`, `expired` had no member ' +
+      'in the act vocabulary, and §7 called the gap "time and not an act".',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    caller: P_BOB,
+    act: 'expire',
+    evidence_hash: null,
+    window_elapsed: false,
+    dispute_window_elapsed: true,
+  },
+  {
+    name: 'expire-before-the-window-is-refused',
+    description:
+      'The window is what makes this exit safe: without it either party could end a live ' +
+      'disagreement the moment it began, which is the unilateral freeze in reverse. The reason ' +
+      'is `dispute-window-not-elapsed` and NOT `illegal-source-state`: this is the one state ' +
+      'from which `expire` is legal, and telling the caller "never" when the answer is "not ' +
+      'yet" is the complaint §7 rewrote that vocabulary to end.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    caller: P_ALICE,
+    act: 'expire',
+    evidence_hash: null,
+    window_elapsed: false,
+    dispute_window_elapsed: false,
+  },
+  {
+    name: 'expire-with-evidence-is-refused',
+    description:
+      '§4.4: both parties’ assertions stay in the chain and the outcome names a window, never a ' +
+      'verdict. An `evidence_hash` here would record a judgement the protocol refuses to make.',
+    edge: EDGE_EVIDENCE,
+    assertions: CONTESTED(EDGE_EVIDENCE),
+    caller: P_ALICE,
+    act: 'expire',
+    evidence_hash: EV,
+    window_elapsed: false,
+    dispute_window_elapsed: true,
   },
   {
     name: 'malformed-edge-says-which-member-is-malformed',
