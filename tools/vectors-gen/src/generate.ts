@@ -390,6 +390,22 @@ export function buildSignatures() {
     return first.toString(16).padStart(2, '0') + honestSig.slice(2);
   })();
 
+  // §6.1's refusal half is deliberately NOT in this family, and the selfcheck is what said so.
+  //
+  // `verifies` here means "does the SIGNATURE verify" — the selfcheck checks it with a real
+  // verifier. A case for "an authentication with no `audience` must be refused" carries a
+  // genuinely VALID signature over a genuinely well-formed object; the refusal comes from the
+  // missing member, not from the cryptography. Pinning it as `verifies: false` would make this
+  // family claim the signature is bad, which is false, and would teach an implementer to reject
+  // for the wrong reason.
+  //
+  // What IS pinned, by the positive case above: `audience` is inside the preimage. An
+  // implementation that omits it produces a different canonical form and a different
+  // `sha256_preimage` and fails that case. That is §6.1's wire-visible half.
+  //
+  // The hub-side rule — "a hub MUST refuse an authentication naming any hub but itself" — is a
+  // behaviour of a hub, and this suite has no hub op. It stays prose until one exists, and
+  // GOVERNANCE's rule applies to it unchanged: uncovered is not yet a conformance requirement.
   const negatives = [
     refuse(
       'signature-over-a-different-object',
@@ -476,6 +492,28 @@ export function buildSignatures() {
           expires_at: '2027-07-01T00:00:00Z',
         },
         ORG_ROOT,
+      ),
+      sign(
+        'inbox-auth-names-its-hub',
+        '§6.1: a hub authentication signature names the hub it is for, INSIDE the preimage. ' +
+          '`audience` is the hub\'s own base URL as the persona\'s §6.7 record spells it. Without ' +
+          'it the signature is a bearer token valid at EVERY hub at once, and §6.7\'s ordered hub ' +
+          'list — which exists so a persona stays reachable when one hub is down — becomes the ' +
+          'attack surface: one compromised hub in that list serves an honest hub\'s challenge as ' +
+          'its own, collects the signature and replays it. A challenge is public by construction ' +
+          'and mintable by anyone, so `audience` is the only thing making the SIGNATURE ' +
+          'non-transferable. Pinning it here pins the wire-visible half — an implementation that ' +
+          'omits `audience` produces a different canonical form and a different preimage, and ' +
+          'fails this case rather than passing a suite that never asked.',
+        {
+          v: PROTOCOL_VERSION,
+          type: 'inbox_auth',
+          persona: ALICE.personaId,
+          audience: 'https://hub.example.org',
+          challenge: 'a'.repeat(64),
+          issued_at: '2026-07-25T09:00:00Z',
+        },
+        ALICE,
       ),
       sign(
         'assertion-proposed',

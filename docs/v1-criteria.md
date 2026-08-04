@@ -257,6 +257,25 @@ implementation may omit the check and pass the suite — which is `GOVERNANCE.md
 uncovered behaviour is not yet a conformance requirement, applied to the day's largest security
 fix. **Outstanding work, not bookkeeping.**
 
+**Half of it is covered as of 2026-08-04, and the half that is not is named.** The `signatures`
+family gained `inbox-auth-names-its-hub`, which pins the canonical form and the preimage of an
+`inbox_auth` object. An implementation that builds one without `audience` produces a different
+canonical form and a different `sha256_preimage` and fails the case — so §6.1's *"inside the
+signed preimage"* is now a conformance requirement rather than a sentence.
+
+The refusal half is not, and an attempt to add it is why the boundary is clear. A case for "an
+authentication with no `audience` MUST be refused" carries a genuinely valid signature over a
+well-formed object: the refusal comes from the missing member, not from the cryptography. Pinned
+in this family as `verifies: false` it asserts the signature is bad, which is untrue — and the
+generator's own selfcheck rejected it, because that field is checked with a real verifier. So the
+family says what a signature is, and cannot say what a hub must do with one.
+
+**"A hub MUST refuse an authentication naming any hub but itself" therefore remains prose**, and
+needs an op this suite does not have — the same shape as `open_loops`, whose ordering cannot be
+pinned before the ranking is normative. Recorded here rather than left as a gap somebody has to
+rediscover: the wire-visible half is covered, the behavioural half is not, and `GOVERNANCE.md`'s
+rule applies to it unchanged.
+
 **`expire` widens a CLOSED vocabulary, which is the heaviest kind of change here, and it is the
 one entry today that fixes a contradiction rather than a gap.** §4.4 argues at length that the
 third exit from `disputed` and `contested-closure` is *not optional* — "a state two people can
