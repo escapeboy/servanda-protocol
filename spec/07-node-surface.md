@@ -35,7 +35,11 @@ Serves both inbound proposals and the local extraction-confirmation queue. Every
   "input": { "id":"edge_id", "act":"done|release|expire", "evidence_hash":"hex|null" },
   "output": { "state":"<the edge's effective state after the assertion>" } }
 ```
-`act` signs one assertion against one edge, as the calling persona, and is the only tool that does. The node MUST verify the resulting assertion against the §4.3 transition table before recording it and MUST reject the call rather than record an invalid assertion (M-14). `done` requires the caller to be the edge's `owner` and `evidence_hash` to be non-null; `release` requires the caller to be `owed_to` and `evidence_hash` to be null (§4.3). **`expire` requires neither role** — §4.4's escape has to reach whoever is trapped and both parties are — and requires `evidence_hash` to be null, `dispute_window` to have elapsed, and the state to be `disputed` or `contested-closure`. It was added to the vocabulary, the tool bindings and the `contested-closure` note while this line still named two acts and this schema still admitted two values, which is the same "exists in the tables and not at the surface" defect that adding it was meant to fix, one level up. A node MUST NOT accept an `act` call from a persona that is not a party to the edge (M-3).
+`act` signs one assertion against one edge, as the calling persona, and is the only tool that does. The node MUST verify the resulting assertion against the §4.3 transition table before recording it and MUST reject the call rather than record an invalid assertion (M-14). `done` requires the caller to be the edge's `owner` and `evidence_hash` to be non-null; `release` requires the caller to be `owed_to` and `evidence_hash` to be null (§4.3). **`expire` requires neither role** — the escape has to reach whoever is trapped, and in each case below both parties are — and requires `evidence_hash` to be null. It is legal from **three** states, with a different clock for each: from `disputed` and from `contested-closure` once `dispute_window` has elapsed since the deadlock (§4.4), and from `open` once the edge's `due` has passed (§4.3).
+
+The previous revision of this sentence named only the first two and called the list exhaustive. That was wrong, and wrong in the way this section keeps being wrong: §4.3 has carried the row `open | expired | either party after due` throughout, and §4.4 leans on exactly that row when it explains `contested-closure` (*"`expired` by either once `due` has passed"*). So the commonest of the three — a dated promise nobody got to — was in the transition table, signable through `act`, and advertised nowhere. It was added to the vocabulary, the tool bindings and the `contested-closure` note while this line still named two acts and this schema still admitted two values, which is the same "exists in the tables and not at the surface" defect that adding it was meant to fix, one level up. Naming two of three states was that defect a third time.
+
+**`expire` is advertised from `open` to BOTH parties once `due` has passed**, and never when `due` is null: §3.1 says an undated promise MUST NOT escalate by time, so there is no date to pass and there never will be. The other two acts that end an edge from `open` each assert something — `done` claims delivery, `release` is forgiveness and therefore a verdict — and `expire` asserts nothing. Like §4.4's use of it, the exit names a window rather than a fault, which is what makes it the only ending that asks neither party to say something untrue about a promise whose moment has simply gone. A node MUST NOT accept an `act` call from a persona that is not a party to the edge (M-3).
 
 **A refusal MUST name its reason from the §4.3 vocabulary, not a narrower one.** v0.1 fixed seven `rejection_reason` values while the transition table produced fifteen, so eight distinct refusals — "the edge is over", "you already signed this one", "the edge object is malformed" — reached the caller as the single word `illegal-source-state`. **The §4.3 vocabulary, and the projection onto §7.** §4.3 produces one reason per rejected
 assertion; §7's `act` reports a narrower set, because a caller can act on fewer distinctions than a
@@ -48,11 +52,14 @@ verifier makes. The mapping is normative and is this:
 | `evidence-hash-required`, `evidence-hash-required-for-owner-closure` | `evidence-hash-required` |
 | `acceptance-window-not-elapsed` | `acceptance-window-not-elapsed` |
 | `dispute-window-not-elapsed` | `dispute-window-not-elapsed` |
+| `due-not-elapsed` | `due-not-elapsed` |
 | `terminal-state-reached` | `terminal-state-reached` |
 | `malformed-edge-acceptance-window` | `malformed-edge-acceptance-window` |
 | everything else | `illegal-source-state` |
 
 `dispute-window-not-elapsed` earns its own row on exactly the reasoning that gave `acceptance-window-not-elapsed` one, and it was missing for one revision: without it, an `expire` refused because the window is still running reports `illegal-source-state` — "you may never do this" — when the truth is "not yet", and `contested-closure` is the one state from which `expire` IS legal. That is the complaint this table opens with, reproduced on the table's own newest act.
+
+`due-not-elapsed` earns its row a third time on the same argument, for `expire` from `open` before the date has passed. The distinction that keeps it from being noise: `expire` on an **undated** edge stays `illegal-source-state`, because there "never" is the true answer — §3.1 forbids time-escalation of an undated promise, so no amount of waiting produces a `due`. One reason means "not yet" and the other means "not ever", and a caller who cannot tell them apart will either wait for a date that will not arrive or conclude the act is broken.
 
 **Two names collide across the two sets and mean different things, deliberately.** §4.3
 distinguishes `evidence-hash-required-for-owner-closure` from the general case because a verifier
@@ -76,13 +83,14 @@ A node MUST report `terminal-state-reached` and `malformed-edge-acceptance-windo
 ## open_loops
 ```json
 { "name": "open_loops",
-  "input": { "view":"owe|waiting|pending|closed|all", "persona":"string|null", "limit":"int" },
+  "input": { "view":"owe|waiting|pending|closed|all", "persona":"string|null", "limit":"int",
+             "cursor":"string|null" },
   "output": { "items":[ { "kind":"commitment|expectation|edge", "id":"...", "intent_or_expect":"...",
                "counterparty":{ "value":"...", "origin":"attested|self-labelled" }|null,
                "verification_level":"0|1|2|3|ext", "age_days":0,
                "due":"...", "state":"...",
                "actions":[ { "act":"done|release|expire|supersede|delegate|ping", "tool":"string|null", "args":{} } ] } ],
-             "total": 0 } }
+             "total": 0, "next_cursor":"string|null", "skipped": 0 } }
 ```
 **`items` is ORDERED, and `total` says how many there are.** The order is the same attention-market ranking `brief` uses, and a client renders it as given — the same rule, and the same reason, as the `actions` array below: which promise a person meets first is a decision, and a decision belongs to the surface that can see all of them. A node MUST NOT return this view in storage order.
 
@@ -90,7 +98,44 @@ A node MUST report `terminal-state-reached` and `malformed-edge-acceptance-windo
 
 v0.1 said neither, and both were absent in the reference implementation: `open_loops` returned items in edge-id hash order — a directory listing — and sliced. So the 500 a client received were an arbitrary subset in a meaningless order, while `brief`, ranked, was telling the same person "894 more, further down" about a list with no further down.
 
-A count and not a cursor, deliberately. What no client could do was TELL that it had been truncated; paging a register that changes between calls is a second problem with failure modes of its own — a stable order under insertion, cursor expiry, items removed mid-page — and none of them should be invented on the way to fixing the first.
+**`total` gives the size and `cursor` gives the rest, and until v0.2 only the first existed.**
+`limit` is capped at 500 and 500 is the largest number anyone can ask for, so a register of 3000
+open things was 500 items read and one integer saying "there are 2500 more, somewhere". The
+previous revision of this paragraph refused a cursor and listed the reasons — *a stable order
+under insertion, cursor expiry, items removed mid-page* — which is the right list of hazards and
+the wrong conclusion from it. The hazards do not disappear along with the cursor; they move onto
+the person holding a register that is unreachable past item 500.
+
+`next_cursor` is an opaque value the node issues. A client returns it as `cursor` and MUST NOT
+construct it, take it apart, or carry it between views. A node MUST emit the member on every page;
+`null` means **the view is finished** and is a statement rather than an absence — which is the one
+thing `total` alone could never settle for a client that asked for 500 and received 500.
+
+**The order MUST be the same for the whole walk.** A node achieves this by freezing the ranking
+instant in the cursor: every page ranks and ages items as of the moment the first page began. Rank
+is a function of (`since`, `due`, `blocking_count`, *now*) and of nothing else — in particular not
+of state — so with *now* frozen an item cannot change position because time passed or because
+somebody signed something. A node MUST NOT rank a later page against a later instant.
+
+A cursor has a finite life. A node MUST refuse a cursor issued for a different `view` or a
+different persona, one it cannot verify, and one older than its own bound — and MUST NOT
+interpret it approximately. Every failure of a wrongly-positioned cursor is a silently skipped
+item, and a silently skipped item is worse than a refused request. This specification does not fix
+the bound, because clocks are not its resource; the reference implementation uses `PT15M`, longer
+than any walk and shorter than the fourteen days that separate the ranking's bands.
+
+**`skipped` says what got ahead of the reader.** An item that ranks above the point a reader has
+already passed will not be delivered on any later page of that walk. That is a property of every
+cursor without per-reader state and is not fixable inside this contract; what IS fixable is
+whether the reader is told, and that is the whole difference between an honest cursor and an
+offset wearing one. `skipped` is a **net** number — it compares how many items rank above the
+cursor now against how many did when it was issued — so an insertion and a removal above the
+cursor in the same interval cancel. It is therefore a **lower bound** on what was missed and never
+an overstatement. A client needing exactness reads the register again from the start; `skipped: 0`
+on every page means nobody got ahead of the reader.
+
+`limit` MAY change between pages. Paging by `cursor` supplements `total` rather than replacing it:
+a node MUST report `total` on every page.
 
 **`counterparty` says where its name came from, and M-12 cannot be enforced without it.** `origin` is `attested` when the name rests on evidence the node holds about a third party, and `self-labelled` when it is an `external_label` (§3.1) — a name *the viewer typed themselves* for someone off-network. A client MUST NOT render an `attested` name above its `verification_level` (M-12); a `self-labelled` name carries no claim about anyone and is rendered whatever the level, because suppressing it would erase the only name that will ever exist for that counterparty and break the solo path §0's base rule protects (M-10).
 
@@ -110,7 +155,14 @@ gave them no way to anticipate.
 
 `expire` sits third, and it is placed by the principle rather than appended to the end. It ends the promise (`expired` is terminal) and it signs (it is bound to `act`), so both clauses put it above `supersede`, which does neither — `supersede` is `tool: null` and proposes. The first revision to add it emitted `supersede` first and left this list at seven members, which is the precise failure the paragraph above was written to prevent: a new act placed by whoever wrote the line rather than by the rule. Caught by an implementer who derived the slot from the principle, found the vectors disagreeing, and complied behind a constant named `EXPIRE_SORTS_AFTER_SUPERSEDE` — compliance under protest, named so the protest survived the compliance.
 
-Where `expire` sorts against `done` and `release` is stated here and exercised by no case, because on the current rules no state advertises it alongside either.
+**That clause is now exercised, and `open` is what exercises it.** Once `due` has passed, an
+`open` edge advertises `done` · `expire` · `supersede` · `delegate` to its owner and
+`release` · `expire` · `ping` · `supersede` to the party it is owed to — `expire` beside `done`
+in one and beside `release` in the other, placed by the principle rather than by the order anyone
+happened to write it in. The previous revision noted that no state advertised it alongside either,
+which was a true observation about the rules AS WRITTEN and a false one about the rules as §4.3
+already had them: an ordering rule that nothing exercises is a rule for a situation that cannot
+arise, and this one could.
 
 **`ping` is advertised where the viewer is waiting on the other party and no timer is already
 running.** That is the whole rule, and v0.1 stated none — §7 said only that `ping` "is not a

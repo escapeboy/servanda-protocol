@@ -14,9 +14,9 @@ implementation is [`spec/08-conformance.md`](../spec/08-conformance.md) and noth
 |---|---|---|
 | 1 | Every §8 MUST is accounted for, in a category that says what it is | **met** — four categories, listed below ([#42](../../issues/42)) |
 | 2 | A second implementation, written from the specification and vectors alone | **met** — `servanda-py`, Node PASS 176/176, claim granted |
-| 3 | No known divergence between the specification and the reference implementation | **met** — §1.7 implemented; the gate is a universal negative and is only ever provisional |
+| 3 | No known divergence between the specification and the reference implementation | **met again as of 2026-08-04** — §7 caught up with three behaviours the implementation had grown ahead of it; see below |
 | 4 | The conformance suite is executable by a third party without this repository's test harness | **met** — `tools/conformance-runner` |
-| 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open until **2026-08-16** — see the register below |
+| 5 | Every normative change has served its `GOVERNANCE.md` discussion window | open until **2026-08-18** — see the register below |
 
 ## What is deliberately NOT a gate
 
@@ -55,6 +55,24 @@ which is how §8 came to claim two vector families that had never existed.
 **The four §9.6 items** — threshold group signing, formal verification of the transition table,
 anonymous credentials for cross-org level-3, post-quantum suites. §9.6 records why each is
 deferred rather than treating them as one bundle.
+
+## Gate 3 went red, and how
+
+**This gate is the one that product work moves in the wrong direction, and it did.** Between
+2026-08-03 and 2026-08-04 the reference implementation grew three normative behaviours that §7 did
+not describe: `expire` from `open` after `due`, the `due-not-elapsed` refusal, and `open_loops`
+paging with `next_cursor`/`skipped` — the last against a paragraph that still said "a count and
+not a cursor, deliberately". Implementation-leads-specification is this project's working pattern
+and is not itself a fault; leaving the text behind is, because this gate is worded as *no KNOWN
+divergence* and three of them were known and written down.
+
+It was closed on 2026-08-04 by landing the text rather than by reverting the code. One divergence
+went the other way and closed itself: `view:"pending"` now serves both halves of the sentence §7
+always had, which it did not before.
+
+The lesson is about sequencing rather than about any of the three: a sprint that changes behaviour
+opens this gate, and it stays open until a specification sprint follows. Planning product work
+without pairing it to spec work therefore moves v1 further away while looking like progress.
 
 ## Gate 3, and why a universal negative is never really "met"
 
@@ -220,6 +238,17 @@ diffing this table against `git log`, which is the only way it was ever going to
 | §7 `contested-closure` is live and advertises only `supersede` | normative-with-vectors | 2026-08-03 | 2026-08-17 |
 | §7 `open_loops` is ranked and reports `total` | normative | 2026-08-03 | 2026-08-17 |
 | §7 `expire` joins the act vocabulary; §4.4's third exit is bound to `act` | normative-with-vectors | 2026-08-03 | 2026-08-17 |
+| §7 `expire` is legal from THREE states; `open` after `due` is the third, advertised to both parties | normative | 2026-08-04 | 2026-08-18 |
+| §7 `due-not-elapsed` joins the `act` rejection projection | normative | 2026-08-04 | 2026-08-18 |
+| §7 `open_loops` takes `cursor` and returns `next_cursor` + `skipped`; the ranking instant is frozen for a walk | normative | 2026-08-04 | 2026-08-18 |
+
+**The register drifted a second time, and the same diff found it.** The three 2026-08-04 rows above
+were normative changes made in the reference implementation on 2026-08-03/04 and written into §7
+on 2026-08-04; none of them was recorded here until the v1 question was asked directly. The first
+drift was caught by diffing this table against `git log`; so was this one. That is now twice, which
+makes it a property of the process rather than an accident: **a register that is updated by
+remembering to update it will be wrong.** The check that finds it is mechanical and the discipline
+that prevents it is not, so the check is the thing to keep.
 
 **§6.1 landed with no vector, and `GOVERNANCE.md` says a normative PR MUST update `vectors/` in
 the same PR.** It is the one entry here that is not merely late to the register: the audience
